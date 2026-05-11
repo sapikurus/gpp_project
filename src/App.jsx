@@ -10,6 +10,7 @@ import Calculator     from './components/Calculator/Calculator.jsx';
 import OfferingLetter from './components/OfferingLetter/OfferingLetter.jsx';
 import PurchaseOrder  from './components/PurchaseOrder/PurchaseOrder.jsx';
 import DeliveryOrder  from './components/DeliveryOrder/DeliveryOrder.jsx';
+import MopsData       from './components/MopsData/MopsData.jsx';
 import MasterData     from './components/MasterData/MasterData.jsx';
 
 export const AppCtx = createContext(null);
@@ -87,6 +88,7 @@ export default function App() {
             <Route path="/offering-letter" element={<OfferingLetter />} />
             <Route path="/purchase-order"  element={<PurchaseOrder />} />
             <Route path="/delivery-order"  element={<DeliveryOrder />} />
+            <Route path="/mops"            element={<MopsData />} />
             <Route path="/master-data/*"   element={<MasterData />} />
             <Route path="*"               element={<Navigate to="/" replace />} />
           </Routes>

@@ -20,6 +20,7 @@ const NAV = [
   { to: '/offering-letter', label: 'Surat Penawaran', icon: '📄' },
   { to: '/purchase-order',  label: 'Purchase Order',  icon: '📋' },
   { to: '/delivery-order',  label: 'Delivery Order',  icon: '🚢' },
+  { to: '/mops',            label: 'Data MOPS',       icon: '📈' },
 ];
 
 export default function Sidebar() {
