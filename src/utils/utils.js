@@ -31,17 +31,31 @@ export const terbilang = (num) => {
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 const ROM = ['','I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+export const INDO_MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 export const toRoman       = (m) => ROM[m] || String(m);
 export const today         = () => new Date().toISOString().slice(0,10);
 export const daysBetween   = (a,b) => !a||!b ? 0 : Math.max(0, Math.round((new Date(b)-new Date(a))/86400000));
 export const formatDateID  = (s) => !s ? '' : new Date(s).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
 export const formatDateShort=(s) => !s ? '' : new Date(s).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
 
+// Auto-fill bi-monthly Pertamina period based on today's date
+export const autoPeriod = () => {
+  const d = new Date();
+  const day   = d.getDate();
+  const month = INDO_MONTHS[d.getMonth()];
+  const year  = d.getFullYear();
+  const daysInMonth = new Date(year, d.getMonth() + 1, 0).getDate();
+  return day <= 14 ? `1 - 14 ${month} ${year}` : `15 - ${daysInMonth} ${month} ${year}`;
+};
+
 // ─── Doc number builders ──────────────────────────────────────────────────────
 export const buildPONumber  = (seq,m,y) => `${String(seq).padStart(2,'0')}/PO-GPP/${toRoman(m)}/${y}`;
 export const buildDONumber  = (seq,m,y) => `${String(seq).padStart(3,'0')}/DO-GPP/${toRoman(m)}/${y}`;
 export const buildBDRNumber = (seq,m,y) => `${String(seq).padStart(3,'0')}/BDR-GPP/${toRoman(m)}/${y}`;
 export const buildOLNumber  = (seq,m,y) => `${String(seq).padStart(3,'0')}/SP-GPP/${toRoman(m)}/${y}`;
+// New SPH format: 001/SPH/GPP/CLIENTCODE/V/2026
+export const buildSPHNumber = (seq, clientCode, m, y) =>
+  `${String(seq).padStart(3,'0')}/SPH/GPP/${clientCode || 'XXX'}/${toRoman(m)}/${y}`;
 
 // ─── Core calculation engine ──────────────────────────────────────────────────
 export const runCalculation = (form) => {
