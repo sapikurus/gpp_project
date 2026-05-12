@@ -48,7 +48,49 @@ const BLANK_T = () => ({
   supplier: '', vessel: '', basePrice: '', vol: '',
   loadDate: today(), payDate: today(),
   applyPPN: true, applyPBBKB: false, noPbbkb: false, pbbkbProvince: '', applyBPHBuy: false,
+  linkedPoId: '', linkedPoNumber: '',
 });
+
+// PO match check — compare tranche fields against linked PO
+function checkPOMatch(tranche, pos) {
+  if (!tranche.linkedPoId) return null; // not linked
+  const po = pos.find(p => p.id === tranche.linkedPoId);
+  if (!po) return { status: 'missing', label: `${tranche.linkedPoNumber} tidak ditemukan` };
+  const poItem     = (po.items || [])[0] || {};
+  const poPrice    = parseFloat(poItem.unitPrice) || 0;
+  const poVol      = parseFloat(poItem.qty)       || 0;
+  const tPrice     = parseFloat(tranche.basePrice) || 0;
+  const tVol       = parseFloat(tranche.vol)       || 0;
+  const priceOk    = poPrice === 0 || Math.abs(tPrice - poPrice) < 1;
+  const volOk      = poVol   === 0 || Math.abs(tVol   - poVol)   < 1;
+  const mismatches = [];
+  if (!priceOk) mismatches.push(`Harga: tranche ${fmt(tPrice,0)} ≠ PO ${fmt(poPrice,0)}`);
+  if (!volOk)   mismatches.push(`Volume: tranche ${Number(tVol).toLocaleString('id-ID')} ≠ PO ${Number(poVol).toLocaleString('id-ID')}`);
+  return mismatches.length
+    ? { status: 'mismatch', label: tranche.linkedPoNumber, mismatches }
+    : { status: 'match',    label: tranche.linkedPoNumber };
+}
+
+// Badge component for tranche table
+function POBadge({ match }) {
+  if (!match) return null;
+  if (match.status === 'match') return (
+    <span className="inline-flex items-center gap-1 text-[10px] bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-semibold">
+      ✅ {match.label}
+    </span>
+  );
+  if (match.status === 'mismatch') return (
+    <span className="group relative inline-flex items-center gap-1 text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-semibold cursor-help">
+      ⚠️ {match.label}
+      <span className="hidden group-hover:block absolute bottom-full left-0 mb-1 w-56 bg-gray-900 text-white text-[10px] rounded-lg px-3 py-2 z-50 shadow-xl">
+        {match.mismatches.join('\n')}
+      </span>
+    </span>
+  );
+  return (
+    <span className="text-[10px] text-gray-400 italic">{match.label} (not found)</span>
+  );
+}
 
 const STATUSES = ['Draft', 'Confirmed', 'Sold Out', 'Closed'];
 const STATUS_BADGE = {
@@ -59,10 +101,31 @@ const STATUS_BADGE = {
 };
 
 // ─── Tranche Modal ────────────────────────────────────────────────────────────
-function TrancheModal({ tranche, rates, provs, onSave, onClose }) {
+function TrancheModal({ tranche, rates, provs, pos, onSave, onClose }) {
   const [t, setT] = useState({ ...tranche });
   const eff = effectivePerL(t, rates, provs);
   const set = k => v => setT(p => ({ ...p, [k]: v }));
+
+  const linkedPO  = pos.find(p => p.id === t.linkedPoId);
+  const poItem    = (linkedPO?.items || [])[0] || {};
+  const poPrice   = parseFloat(poItem.unitPrice) || 0;
+  const poVol     = parseFloat(poItem.qty)       || 0;
+  const tPrice    = parseFloat(t.basePrice)      || 0;
+  const tVol      = parseFloat(t.vol)            || 0;
+  const priceOk   = !linkedPO || poPrice === 0 || Math.abs(tPrice - poPrice) < 1;
+  const volOk     = !linkedPO || poVol   === 0 || Math.abs(tVol   - poVol)   < 1;
+  const isMatched = linkedPO && priceOk && volOk && tPrice > 0;
+  const hasMismatch = linkedPO && (!priceOk || !volOk);
+
+  const prefillFromPO = () => {
+    if (!linkedPO) return;
+    setT(p => ({
+      ...p,
+      supplier:  linkedPO.vendorName || p.supplier,
+      basePrice: poPrice || p.basePrice,
+      vol:       poVol   || p.vol,
+    }));
+  };
 
   const IF = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300';
 
@@ -70,46 +133,85 @@ function TrancheModal({ tranche, rates, provs, onSave, onClose }) {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b">
-          <h2 className="font-bold text-gray-800">
-            {tranche.supplier || tranche.basePrice ? 'Edit Tranche' : 'Add Tranche'}
-          </h2>
+          <h2 className="font-bold text-gray-800">{tranche.basePrice ? 'Edit Tranche' : 'Add Tranche'}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
         </div>
         <div className="p-5 space-y-4">
+
+          {/* PO Link */}
+          <div className="border border-blue-100 rounded-xl p-4 bg-blue-50">
+            <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-1">Link ke Purchase Order</p>
+            <p className="text-[10px] text-blue-400 mb-3">Opsional. Link PO setelah disetujui untuk validasi harga & volume.</p>
+            <select className={IF + ' bg-white'} value={t.linkedPoId}
+              onChange={e => {
+                const po = pos.find(p => p.id === e.target.value);
+                setT(p => ({ ...p, linkedPoId: e.target.value, linkedPoNumber: po?.docNumber || '' }));
+              }}>
+              <option value="">— Tidak ada (modeling saja) —</option>
+              {pos.map(po => <option key={po.id} value={po.id}>{po.docNumber} · {po.vendorName || '-'} · {po.poDate}</option>)}
+            </select>
+
+            {linkedPO && (
+              <div className="mt-3 space-y-2">
+                <div className="text-xs text-blue-700 bg-white rounded-lg px-3 py-2 border border-blue-100">
+                  <p className="font-semibold">{linkedPO.docNumber} — {linkedPO.vendorName}</p>
+                  {poPrice > 0 && <p className="text-blue-500 mt-0.5">Harga PO: {fmt(poPrice,0)}/L · Vol: {Number(poVol).toLocaleString('id-ID')} L</p>}
+                </div>
+                {isMatched && (
+                  <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                    <span>✅</span><span className="font-semibold">Harga dan volume sesuai PO</span>
+                  </div>
+                )}
+                {hasMismatch && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
+                    <p className="font-semibold mb-1">⚠️ Tidak sesuai PO:</p>
+                    {!priceOk && <p>• Harga: tranche <b>{fmt(tPrice,0)}</b> ≠ PO <b>{fmt(poPrice,0)}</b></p>}
+                    {!volOk   && <p>• Volume: tranche <b>{Number(tVol).toLocaleString('id-ID')}</b> ≠ PO <b>{Number(poVol).toLocaleString('id-ID')}</b></p>}
+                    <button onClick={prefillFromPO} className="mt-2 text-[10px] bg-amber-100 hover:bg-amber-200 text-amber-800 px-3 py-1 rounded-lg font-semibold">↓ Prefill dari PO</button>
+                  </div>
+                )}
+                {linkedPO && !hasMismatch && !isMatched && (
+                  <button onClick={prefillFromPO} className="text-[10px] bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1 rounded-lg font-semibold">↓ Prefill dari PO</button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Fields */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Supplier</label>
-              <input type="text" value={t.supplier || ''} onChange={e => set('supplier')(e.target.value)}
-                placeholder="Nama supplier" className={IF}/>
+              <input type="text" value={t.supplier||''} onChange={e=>set('supplier')(e.target.value)} placeholder="Nama supplier" className={IF}/>
             </div>
             <div>
               <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Vessel / SPOB</label>
-              <input type="text" value={t.vessel || ''} onChange={e => set('vessel')(e.target.value)}
-                placeholder="SPOB Pandawa V" className={IF}/>
+              <input type="text" value={t.vessel||''} onChange={e=>set('vessel')(e.target.value)} placeholder="SPOB Pandawa V" className={IF}/>
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Base Price (IDR/L)</label>
-              <input type="number" value={t.basePrice} onChange={e => set('basePrice')(e.target.value)}
-                placeholder="0" className={IF}/>
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                Base Price (IDR/L){linkedPO && !priceOk && <span className="text-amber-500 ml-1">≠ PO</span>}{linkedPO && priceOk && tPrice>0 && <span className="text-green-500 ml-1">✓</span>}
+              </label>
+              <input type="number" value={t.basePrice} onChange={e=>set('basePrice')(e.target.value)} placeholder="0" className={IF+(linkedPO&&!priceOk?' border-amber-300':'')}/>
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Volume (L)</label>
-              <input type="number" value={t.vol} onChange={e => set('vol')(e.target.value)}
-                placeholder="0" className={IF}/>
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                Volume (L){linkedPO && !volOk && <span className="text-amber-500 ml-1">≠ PO</span>}{linkedPO && volOk && tVol>0 && <span className="text-green-500 ml-1">✓</span>}
+              </label>
+              <input type="number" value={t.vol} onChange={e=>set('vol')(e.target.value)} placeholder="0" className={IF+(linkedPO&&!volOk?' border-amber-300':'')}/>
             </div>
             <div>
               <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Load Date</label>
-              <input type="date" value={t.loadDate} onChange={e => set('loadDate')(e.target.value)} className={IF}/>
+              <input type="date" value={t.loadDate} onChange={e=>set('loadDate')(e.target.value)} className={IF}/>
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Pay Date (TOP to supplier)</label>
-              <input type="date" value={t.payDate} onChange={e => set('payDate')(e.target.value)} className={IF}/>
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Pay Date (TOP ke supplier)</label>
+              <input type="date" value={t.payDate} onChange={e=>set('payDate')(e.target.value)} className={IF}/>
             </div>
             <div className="col-span-2">
               <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Province (PBBKB)</label>
-              <select value={t.pbbkbProvince} onChange={e => set('pbbkbProvince')(e.target.value)} className={IF}>
+              <select value={t.pbbkbProvince} onChange={e=>set('pbbkbProvince')(e.target.value)} className={IF}>
                 <option value="">— Pilih Provinsi —</option>
-                {provs.map((p, i) => <option key={i} value={p.name}>{p.name} ({p.rate}%)</option>)}
+                {provs.map((p,i)=><option key={i} value={p.name}>{p.name} ({p.rate}%)</option>)}
               </select>
             </div>
           </div>
@@ -118,44 +220,39 @@ function TrancheModal({ tranche, rates, provs, onSave, onClose }) {
           <div className="border border-gray-100 rounded-xl p-4 bg-gray-50 space-y-2.5">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Pajak dari Supplier</p>
             <label className="flex items-center gap-2.5 cursor-pointer">
-              <input type="checkbox" checked={t.applyPPN} onChange={e => set('applyPPN')(e.target.checked)} className="rounded w-4 h-4 accent-blue-600"/>
-              <div>
-                <span className="text-sm text-gray-700">PPN {rates?.ppn || 11}%</span>
-                <span className="text-[10px] text-gray-400 ml-2">(pass-through — tidak mempengaruhi modal/L)</span>
-              </div>
+              <input type="checkbox" checked={t.applyPPN} onChange={e=>set('applyPPN')(e.target.checked)} className="rounded w-4 h-4 accent-blue-600"/>
+              <span className="text-sm text-gray-700">PPN {rates?.ppn||11}%</span>
+              <span className="text-[10px] text-gray-400">(pass-through — tidak mempengaruhi modal/L)</span>
             </label>
             <label className="flex items-center gap-2.5 cursor-pointer">
-              <input type="checkbox" checked={t.applyBPHBuy} onChange={e => set('applyBPHBuy')(e.target.checked)} className="rounded w-4 h-4 accent-blue-600"/>
-              <span className="text-sm text-gray-700">Supplier charges BPH Migas ({rates?.bphMigas || 0.25}%)</span>
+              <input type="checkbox" checked={t.applyBPHBuy} onChange={e=>set('applyBPHBuy')(e.target.checked)} className="rounded w-4 h-4 accent-blue-600"/>
+              <span className="text-sm text-gray-700">Supplier charges BPH Migas ({rates?.bphMigas||0.25}%)</span>
             </label>
             <label className="flex items-center gap-2.5 cursor-pointer">
-              <input type="checkbox" checked={t.applyPBBKB} onChange={e => set('applyPBBKB')(e.target.checked)} className="rounded w-4 h-4 accent-blue-600"/>
-              <span className="text-sm text-gray-700">PBBKB {t.pbbkbProvince ? `(${t.pbbkbProvince})` : ''}</span>
+              <input type="checkbox" checked={t.applyPBBKB} onChange={e=>set('applyPBBKB')(e.target.checked)} className="rounded w-4 h-4 accent-blue-600"/>
+              <span className="text-sm text-gray-700">PBBKB {t.pbbkbProvince?`(${t.pbbkbProvince})`:''}</span>
             </label>
             {t.applyPBBKB && (
               <label className="flex items-center gap-2.5 cursor-pointer ml-6">
-                <input type="checkbox" checked={t.noPbbkb || false} onChange={e => set('noPbbkb')(e.target.checked)} className="rounded w-4 h-4 accent-amber-500"/>
-                <span className="text-xs text-amber-600">Omit PBBKB from buying price (non-Wapu / non-PKP supplier)</span>
+                <input type="checkbox" checked={t.noPbbkb||false} onChange={e=>set('noPbbkb')(e.target.checked)} className="rounded w-4 h-4 accent-amber-500"/>
+                <span className="text-xs text-amber-600">Omit PBBKB (non-Wapu / non-PKP supplier)</span>
               </label>
             )}
           </div>
 
-          {/* Live modal preview */}
-          {(parseFloat(t.basePrice) > 0) && (
+          {parseFloat(t.basePrice)>0 && (
             <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex justify-between items-center">
-              <span className="text-sm text-blue-700 font-semibold">Modal/L (Effective)</span>
-              <span className="font-mono font-bold text-blue-800">{fmt(eff, 2)}</span>
+              <span className="text-sm text-blue-700 font-semibold">Modal/L (excl. PPN)</span>
+              <span className="font-mono font-bold text-blue-800">{fmt(eff,2)}</span>
             </div>
           )}
         </div>
         <div className="flex gap-3 p-5 border-t">
-          <button onClick={() => onSave(t)} disabled={!t.basePrice || !t.vol}
+          <button onClick={()=>onSave(t)} disabled={!t.basePrice||!t.vol}
             className="flex-1 bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-50">
             💾 Save Tranche
           </button>
-          <button onClick={onClose} className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-            Cancel
-          </button>
+          <button onClick={onClose} className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
         </div>
       </div>
     </div>
@@ -289,8 +386,11 @@ export default function Stok() {
       const existing = tranches.find(x => x.id === t.id);
       const next = existing ? tranches.map(x => x.id === t.id ? t : x) : [...tranches, t];
       const totalVolume = next.reduce((s, tr) => s + (parseFloat(tr.vol) || 0), 0);
-      await updateSubDoc(STOCKS_REF(), selected.id, { tranches: next, totalVolume });
-      setStocks(s => s.map(x => x.id === selected.id ? { ...x, tranches: next, totalVolume } : x));
+      // Auto-confirm stock if any tranche is now linked to a PO
+      const hasLinkedPO = next.some(tr => tr.linkedPoId);
+      const newStatus = hasLinkedPO && selected.status === 'Draft' ? 'Confirmed' : selected.status;
+      await updateSubDoc(STOCKS_REF(), selected.id, { tranches: next, totalVolume, status: newStatus });
+      setStocks(s => s.map(x => x.id === selected.id ? { ...x, tranches: next, totalVolume, status: newStatus } : x));
       setTrancheModal(null);
     } finally { setSavingTranche(false); }
   };
@@ -337,6 +437,7 @@ export default function Stok() {
           tranche={trancheModal}
           rates={rates}
           provs={provs}
+          pos={pos}
           onSave={saveTranche}
           onClose={() => setTrancheModal(null)}
         />
@@ -499,7 +600,7 @@ export default function Stok() {
                   <table className="w-full text-xs">
                     <thead className="bg-gray-50 border-b border-gray-100">
                       <tr>
-                        {['Supplier','Vessel','Base Price','Volume (L)','Load Date','Province','Taxes','Modal/L',''].map(h => (
+                        {['Supplier','Vessel','Base Price','Volume (L)','Load Date','Province','Taxes','Modal/L','PO',''].map(h => (
                           <th key={h} className="text-left px-4 py-2.5 font-semibold text-gray-400 whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
@@ -517,6 +618,9 @@ export default function Stok() {
                             <td className="px-4 py-3 text-gray-500 max-w-[120px] truncate">{t.pbbkbProvince || '–'}</td>
                             <td className="px-4 py-3 text-gray-400 text-[10px] whitespace-nowrap">{taxLabel(t, rates, provs)}</td>
                             <td className="px-4 py-3 font-mono font-bold text-blue-600">{fmt(eff, 2)}</td>
+                            <td className="px-4 py-3">
+                              <POBadge match={checkPOMatch(t, pos)} />
+                            </td>
                             <td className="px-4 py-3">
                               <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button onClick={() => setTrancheModal({ ...t })}
