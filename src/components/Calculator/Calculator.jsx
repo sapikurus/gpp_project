@@ -157,17 +157,16 @@ export default function Calculator() {
     const { tranches, offeringDate, clientTOP, province, lossRate, oatModal, oatClient, sellMode, sellPrice, mopsUSD, jisdor, premium, mopsWeight, hipBBN } = form;
     if (!tranches.length) return null;
 
-    // Blended buy — volume-weighted effective cost
+    // Blended buy — volume-weighted effective cost (PPN excluded: pass-through, claimed back as input credit)
     let totalVol = 0, totalEffValue = 0;
     tranches.forEach(t => {
       const vol  = n(t.vol), base = n(t.basePrice);
       const prov = pbbkbProvinces.find(p => p.name === t.pbbkbProvince);
       const pbbkbR = (t.applyPBBKB && !t.noPbbkb) ? (n(prov?.rate) / 100) : 0;
-      const ppnAmt = t.applyPPN     ? base * ppnRate              : 0;
       const pbbkb  = base * pbbkbR;
       const bph    = t.applyBPHBuy  ? base * (n(rates.bphMigas) / 100) : 0;
       totalVol      += vol;
-      totalEffValue += (base + ppnAmt + pbbkb + bph) * vol;
+      totalEffValue += (base + pbbkb + bph) * vol;
     });
     if (!totalVol) return null;
     const blendedModal = totalEffValue / totalVol;

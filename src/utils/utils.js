@@ -77,10 +77,11 @@ export const runCalculation = (form) => {
     const base  = parseFloat(t.basePrice) || 0;
     const top   = daysBetween(t.loadDate, t.payDate);
     const pbbkbR = t.applyPBBKB && !t.noPbbkb ? provRate(t.pbbkbProvince) : 0;
-    const ppnAmt   = t.applyPPN    ? base * ppnRate  : 0;
+    // PPN excluded from cost — pass-through tax (input credit claimed against output VAT)
     const pbbkbAmt = base * pbbkbR;
     const bphAmt   = t.applyBPHBuy ? base * bphRate  : 0;
-    const eff      = base + ppnAmt + pbbkbAmt + bphAmt;
+    const ppnAmt   = t.applyPPN    ? base * ppnRate  : 0; // kept for reference only
+    const eff      = base + pbbkbAmt + bphAmt;            // PPN not in cost
     const value    = eff * vol;
     // Compound CoM: value × ((1+r)^(TOP/365) − 1)
     const com = top > 0 ? value * (Math.pow(1 + bankRate, top / 365) - 1) : 0;

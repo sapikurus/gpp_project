@@ -11,11 +11,11 @@ import { canDelete } from '../../utils/approvalUtils.js';
 // ─── Calculation helpers ──────────────────────────────────────────────────────
 function effectivePerL(t, rates, provs) {
   const base  = parseFloat(t.basePrice) || 0;
-  const ppnR  = (parseFloat(rates?.ppn)      || 0) / 100;
+  // PPN excluded — pass-through tax, claimed back as input credit
   const bphR  = (parseFloat(rates?.bphMigas) || 0) / 100;
   const prov  = provs?.find(p => p.name === t.pbbkbProvince);
   const pbR   = (t.applyPBBKB && !t.noPbbkb) ? (parseFloat(prov?.rate) || 0) / 100 : 0;
-  return base + (t.applyPPN ? base * ppnR : 0) + base * pbR + (t.applyBPHBuy ? base * bphR : 0);
+  return base + base * pbR + (t.applyBPHBuy ? base * bphR : 0);
 }
 
 function calcBlended(tranches = [], rates, provs) {
@@ -37,7 +37,8 @@ function taxLabel(t, rates, provs) {
     parts.push(`PBBKB${r ? ` ${r}%` : ''}`);
   }
   if (t.noPbbkb) parts.push('~PBBKB');
-  return parts.length ? parts.join(' + ') : '–';
+  // PPN not shown as cost — it's pass-through (input credit)
+  return parts.length ? parts.join(' + ') : (t.applyPPN ? 'PPN (pass-through)' : '–');
 }
 
 const fmt  = (v, d = 3) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: d, maximumFractionDigits: d }).format(Number(v) || 0);
@@ -118,7 +119,10 @@ function TrancheModal({ tranche, rates, provs, onSave, onClose }) {
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Pajak dari Supplier</p>
             <label className="flex items-center gap-2.5 cursor-pointer">
               <input type="checkbox" checked={t.applyPPN} onChange={e => set('applyPPN')(e.target.checked)} className="rounded w-4 h-4 accent-blue-600"/>
-              <span className="text-sm text-gray-700">PPN {rates?.ppn || 11}%</span>
+              <div>
+                <span className="text-sm text-gray-700">PPN {rates?.ppn || 11}%</span>
+                <span className="text-[10px] text-gray-400 ml-2">(pass-through — tidak mempengaruhi modal/L)</span>
+              </div>
             </label>
             <label className="flex items-center gap-2.5 cursor-pointer">
               <input type="checkbox" checked={t.applyBPHBuy} onChange={e => set('applyBPHBuy')(e.target.checked)} className="rounded w-4 h-4 accent-blue-600"/>
