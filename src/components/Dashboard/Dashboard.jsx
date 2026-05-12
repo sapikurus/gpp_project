@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../App.jsx';
-import { fetchCollection, POS_REF, DOS_REF, CALCS_REF, STOCKS_REF, SOS_REF } from '../../firebase.js';
+import { fetchCollection, POS_REF, DOS_REF, STOCKS_REF, SOS_REF, OLS_REF } from '../../firebase.js';
 import { formatIDR } from '../../utils/utils.js';
 import { statusMeta, canApprove, getChain } from '../../utils/approvalUtils.js';
 
@@ -16,6 +16,10 @@ const StatCard = ({ label, value, sub, color='blue', onClick, badge }) => (
   </div>
 );
 
+const TYPE_LABELS = { po: 'Purchase Order', so: 'Sales Order', ol: 'Surat Penawaran' };
+const TYPE_COLORS = { po: 'purple', so: 'blue', ol: 'amber' };
+const TYPE_ROUTES = { po: '/purchase-order', so: '/sales-order', ol: '/offering-letter' };
+
 export default function Dashboard() {
   const { appData, userRole } = useApp();
   const nav = useNavigate();
@@ -23,7 +27,9 @@ export default function Dashboard() {
   const [dos,    setDOs]    = useState([]);
   const [stocks, setStocks] = useState([]);
   const [sos,    setSOs]    = useState([]);
+  const [ols,    setOLs]    = useState([]);
   const [loading,setL]      = useState(true);
+
   const chain_po = getChain(appData?.settings, 'po');
   const chain_so = getChain(appData?.settings, 'so');
   const chain_ol = getChain(appData?.settings, 'ol');
@@ -34,20 +40,23 @@ export default function Dashboard() {
       fetchCollection(DOS_REF()),
       fetchCollection(STOCKS_REF()),
       fetchCollection(SOS_REF()),
-    ]).then(([p,d,st,s]) => { setPOs(p); setDOs(d); setStocks(st); setSOs(s); setL(false); });
+      fetchCollection(OLS_REF()),
+    ]).then(([p,d,st,s,ol]) => { setPOs(p); setDOs(d); setStocks(st); setSOs(s); setOLs(ol); setL(false); });
   }, []);
 
-  // Pending approvals for this user's role
-  const pendingPOs = pos.filter(p => canApprove(userRole, p.approvalStatus, chain_po));
-  const pendingSOs = sos.filter(s => canApprove(userRole, s.approvalStatus, chain_so));
-  const totalPending = pendingPOs.length + pendingSOs.length;
+  // Pending approvals for this user's role — all types
+  const pendingItems = [
+    ...pos.filter(p => canApprove(userRole, p.approvalStatus, chain_po)).map(p => ({ type:'po', doc:p, number:p.docNumber, name:p.vendorName, amount:formatIDR(p.totalOrder) })),
+    ...sos.filter(s => canApprove(userRole, s.approvalStatus, chain_so)).map(s => ({ type:'so', doc:s, number:s.docNumber, name:s.clientName, amount:s.volume ? Number(s.volume).toLocaleString('id-ID')+' L' : '' })),
+    ...ols.filter(o => canApprove(userRole, o.approvalStatus, chain_ol)).map(o => ({ type:'ol', doc:o, number:o.docNumber, name:o.clientName, amount:o.dpp ? `Rp ${Number(o.dpp).toLocaleString('id-ID')}/L` : '' })),
+  ];
 
   // Stock metrics
   const confirmedStocks = stocks.filter(s => s.status === 'Confirmed');
   const totalAvailable  = confirmedStocks.reduce((sum, s) => sum + Math.max(0, (s.totalVolume||0)-(s.committedVolume||0)), 0);
   const totalCommitted  = confirmedStocks.reduce((sum, s) => sum + (s.committedVolume||0), 0);
 
-  // SO metrics
+  // PO / SO metrics
   const approvedSOs   = sos.filter(s => s.approvalStatus === 'approved');
   const totalSOVolume = approvedSOs.reduce((sum, s) => sum + (parseFloat(s.volume)||0), 0);
   const totalPOValue  = pos.reduce((s, p) => s + (p.totalOrder||0), 0);
@@ -59,43 +68,66 @@ export default function Dashboard() {
         <p className="text-gray-500 text-sm mt-1">PT Global Petro Pasifik</p>
       </div>
 
-      {/* Pending approvals banner */}
-      {totalPending > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-5 py-4 mb-6 flex items-center justify-between">
-          <div>
-            <p className="font-semibold text-yellow-800">⏳ {totalPending} dokumen menunggu persetujuan Anda</p>
-            <p className="text-xs text-yellow-600 mt-0.5">
-              {pendingPOs.length > 0 && `${pendingPOs.length} PO`}
-              {pendingPOs.length > 0 && pendingSOs.length > 0 && ' · '}
-              {pendingSOs.length > 0 && `${pendingSOs.length} SO`}
-            </p>
+      {/* ── Pending Approval Tasks ── */}
+      {pendingItems.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-amber-200 mb-6 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3 bg-amber-50 border-b border-amber-100">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">⏳</span>
+              <p className="font-semibold text-amber-800">Tugas Menunggu Persetujuan Anda</p>
+              <span className="bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{pendingItems.length}</span>
+            </div>
           </div>
-          <div className="flex gap-2">
-            {pendingPOs.length > 0 && <button onClick={() => nav('/purchase-order')} className="text-xs bg-yellow-600 text-white px-3 py-1.5 rounded-lg hover:bg-yellow-700">Lihat PO →</button>}
-            {pendingSOs.length > 0 && <button onClick={() => nav('/sales-order')}    className="text-xs bg-yellow-600 text-white px-3 py-1.5 rounded-lg hover:bg-yellow-700">Lihat SO →</button>}
+          <div className="divide-y divide-gray-100">
+            {pendingItems.map((item, i) => {
+              const m = statusMeta(item.doc.approvalStatus);
+              const color = TYPE_COLORS[item.type];
+              return (
+                <div key={i} className="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-2 h-8 rounded-full bg-${color}-400 shrink-0`}/>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-bold text-${color}-600 uppercase tracking-widest`}>{TYPE_LABELS[item.type]}</span>
+                        <span className="font-mono text-xs font-semibold text-gray-700">{item.number}</span>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${m.badge}`}>{m.label}</span>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-0.5">{item.name}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {item.amount && <span className="text-xs text-gray-400 font-mono">{item.amount}</span>}
+                    <button onClick={() => nav(TYPE_ROUTES[item.type])}
+                      className="text-xs bg-blue-700 text-white px-3 py-1.5 rounded-lg hover:bg-blue-800 font-semibold whitespace-nowrap">
+                      Buka →
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Stat cards */}
+      {/* ── Stat cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="Stok Tersedia" value={loading?'…':Number(totalAvailable).toLocaleString('id-ID')+' L'}
-          sub={`dari ${confirmedStocks.length} stok confirmed`} color="blue" onClick={()=>nav('/stok')} />
+          sub={`${confirmedStocks.length} stok confirmed`} color="blue" onClick={() => nav('/stok')} />
         <StatCard label="Terikat SO" value={loading?'…':Number(totalCommitted).toLocaleString('id-ID')+' L'}
-          sub={`${approvedSOs.length} SO disetujui`} color="orange" onClick={()=>nav('/sales-order')} />
+          sub={`${approvedSOs.length} SO disetujui`} color="orange" onClick={() => nav('/sales-order')} />
         <StatCard label="Total PO" value={loading?'…':pos.length}
-          sub={formatIDR(totalPOValue)} color="purple" onClick={()=>nav('/purchase-order')}
-          badge={pendingPOs.length > 0 ? String(pendingPOs.length) : null} />
+          sub={formatIDR(totalPOValue)} color="purple" onClick={() => nav('/purchase-order')}
+          badge={pendingItems.filter(p=>p.type==='po').length || null} />
         <StatCard label="Delivery Orders" value={loading?'…':dos.length}
-          sub="Surat Jalan + BDR" color="green" onClick={()=>nav('/delivery-order')} />
+          sub="Surat Jalan + BDR" color="green" onClick={() => nav('/delivery-order')} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Confirmed stocks with volume bars */}
+        {/* Confirmed stocks */}
         <div className="bg-white rounded-xl shadow-sm p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-gray-700">Stok Confirmed</h2>
-            <button onClick={()=>nav('/stok')} className="text-blue-600 text-xs hover:underline">Lihat Semua →</button>
+            <button onClick={() => nav('/stok')} className="text-blue-600 text-xs hover:underline">Lihat Semua →</button>
           </div>
           {loading ? <p className="text-gray-400 text-sm">Memuat…</p> :
            confirmedStocks.length === 0 ? <p className="text-gray-400 text-sm">Belum ada stok confirmed.</p> : (
@@ -120,11 +152,11 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Recent SO with approval status */}
+        {/* Recent SO */}
         <div className="bg-white rounded-xl shadow-sm p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-gray-700">Sales Order Terbaru</h2>
-            <button onClick={()=>nav('/sales-order')} className="text-blue-600 text-xs hover:underline">Lihat Semua →</button>
+            <button onClick={() => nav('/sales-order')} className="text-blue-600 text-xs hover:underline">Lihat Semua →</button>
           </div>
           {loading ? <p className="text-gray-400 text-sm">Memuat…</p> :
            sos.length === 0 ? <p className="text-gray-400 text-sm">Belum ada SO.</p> : (
@@ -134,11 +166,18 @@ export default function Dashboard() {
                 return (
                   <div key={s.id} className="flex items-center justify-between py-2 border-b last:border-0">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-700 truncate">{s.clientName}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-gray-700 truncate">{s.clientName}</p>
+                        {s.linkedOlNumber && (
+                          <span className="text-[10px] text-purple-500 font-mono bg-purple-50 px-1.5 py-0.5 rounded shrink-0">
+                            📄 {s.linkedOlNumber}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-gray-400 font-mono">{s.docNumber}</p>
                     </div>
                     <div className="text-right ml-3 shrink-0">
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${m.badge}`}>{m.label}</span>
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${m.badge}`}>{m.label}</span>
                       <p className="text-xs text-gray-400 mt-0.5">{s.volume ? Number(s.volume).toLocaleString('id-ID')+' L' : '-'}</p>
                     </div>
                   </div>

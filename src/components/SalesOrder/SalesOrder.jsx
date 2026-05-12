@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useApp } from '../../App.jsx';
 import {
   fetchCollection, createNumberedDoc, updateSubDoc, deleteSubDoc,
-  SOS_REF, STOCKS_REF, applyApprovalDirect, approveSoFinal,
+  SOS_REF, STOCKS_REF, OLS_REF, applyApprovalDirect, approveSoFinal,
 } from '../../firebase.js';
 import { today, formatIDR, formatDateID, toRoman } from '../../utils/utils.js';
 import {
@@ -17,6 +17,7 @@ const INIT = {
   soDate: today(), stockId: '', stockLabel: '', clientName: '', clientContact: '',
   product: '', volume: '', agreedPrice: '', paymentTerms: 'Credit',
   clientTOP: 30, deliveryProvince: '', deliveryLocation: '', notes: '',
+  linkedOlId: '', linkedOlNumber: '',
   approvalStatus: 'draft', approvalHistory: [],
 };
 
@@ -28,8 +29,9 @@ function buildSONumber(seq, m, y) {
 
 export default function SalesOrder() {
   const { appData, user, userRole } = useApp();
-  const [sos, setSOs] = useState([]);
-  const [stocks, setStocks] = useState([]);
+  const [sos,    setSOs]   = useState([]);
+  const [stocks, setStocks]= useState([]);
+  const [ols,    setOLs]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showDetail, setShowDetail] = useState(null);
@@ -45,13 +47,31 @@ export default function SalesOrder() {
   const co = appData?.headOffice || appData?.company || {};
 
   useEffect(() => {
-    Promise.all([fetchCollection(SOS_REF()), fetchCollection(STOCKS_REF())])
-      .then(([s, st]) => { setSOs(s); setStocks(st); setLoading(false); });
+    Promise.all([fetchCollection(SOS_REF()), fetchCollection(STOCKS_REF()), fetchCollection(OLS_REF())])
+      .then(([s, st, ol]) => { setSOs(s); setStocks(st); setOLs(ol); setLoading(false); });
   }, []);
 
   const set = k => v => setForm(p => ({ ...p, [k]: v }));
 
-  const openNew = () => { setForm(INIT); setEditing(null); setShowForm(true); };
+  // When an OL is selected, prefill SO fields from it
+  const setFromOL = (ol) => {
+    if (!ol) { setForm(p => ({ ...p, linkedOlId:'', linkedOlNumber:'' })); return; }
+    const client = clients.find(c => c.name === ol.clientName) || {};
+    setForm(p => ({
+      ...p,
+      linkedOlId:      ol.id,
+      linkedOlNumber:  ol.docNumber,
+      clientName:      ol.clientName      || p.clientName,
+      clientContact:   ol.clientContact   || client.contact || p.clientContact,
+      product:         ol.product         || p.product,
+      agreedPrice:     ol.dpp             || p.agreedPrice,
+      deliveryProvince:ol.province        || p.deliveryProvince,
+      paymentTerms:    ol.paymentMode === 'CBD' ? 'CBD' : ol.paymentMode === 'COD' ? 'COD' : 'Credit',
+      clientTOP:       ol.clientTOP       || p.clientTOP,
+    }));
+  };
+
+  const openNew  = () => { setForm(INIT); setEditing(null); setShowForm(true); };
   const openEdit = (so) => {
     if (!isEditable(so.approvalStatus)) return;
     setForm({ ...INIT, ...so }); setEditing(so.id); setShowForm(true);
@@ -176,6 +196,7 @@ export default function SalesOrder() {
                   <div><span className="text-gray-400">Harga</span><p className="text-gray-700 font-mono">{so.agreedPrice ? formatIDR(so.agreedPrice)+'/L' : '-'}</p></div>
                   <div><span className="text-gray-400">Terms</span><p className="text-gray-700">{so.paymentTerms} {so.clientTOP ? `(${so.clientTOP}d)` : ''}</p></div>
                   {stock && <div className="col-span-2"><span className="text-gray-400">Stok: </span><span className="text-blue-600 font-medium">{stock.label}</span></div>}
+                  {so.linkedOlNumber && <div className="col-span-2"><span className="text-gray-400">OL: </span><span className="text-purple-600 font-mono text-xs">{so.linkedOlNumber}</span></div>}
                 </div>
                 <div className="flex gap-2 border-t pt-3">
                   <button onClick={() => setShowDetail(so)} className="flex-1 text-sm text-blue-700 border border-blue-200 py-2 rounded-lg hover:bg-blue-50 font-medium">Detail & Approval</button>
@@ -269,6 +290,34 @@ export default function SalesOrder() {
                       return <option key={s.id} value={s.id}>{s.label} ({Number(avail).toLocaleString('id-ID')} L tersedia)</option>;
                     })}
                   </select>
+                </div>
+
+                {/* OL linkage */}
+                <div className="col-span-2">
+                  <label className="block text-xs text-gray-500 mb-1">
+                    Link ke Surat Penawaran
+                    <span className="text-gray-300 ml-1">(opsional — prefill dari OL)</span>
+                  </label>
+                  <select value={form.linkedOlId}
+                    onChange={e => {
+                      const ol = ols.find(x => x.id === e.target.value);
+                      setFromOL(ol || null);
+                    }}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white">
+                    <option value="">— Tidak ada / manual —</option>
+                    {ols.map(ol => (
+                      <option key={ol.id} value={ol.id}>
+                        {ol.docNumber} · {ol.clientName} · {ol.period}
+                      </option>
+                    ))}
+                  </select>
+                  {form.linkedOlId && (
+                    <div className="mt-1.5 flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-1.5 text-xs text-blue-700">
+                      <span>📄</span>
+                      <span className="font-semibold">{form.linkedOlNumber}</span>
+                      <span className="text-blue-400">— client & harga dari OL</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="col-span-2"><label className="block text-xs text-gray-500 mb-1">Client *</label>
