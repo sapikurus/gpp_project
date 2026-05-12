@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { logout } from '../../firebase.js';
+import { logout, changePassword } from '../../firebase.js';
 import { useApp } from '../../App.jsx';
 import { canSeeMasterData, ROLE_MENU } from '../../utils/approvalUtils.js';
 import logo from '../../assets/gpp-logo.png';
@@ -38,6 +38,32 @@ export default function Sidebar() {
   const isMasterActive = location.pathname.startsWith('/master-data');
   const [masterOpen,  setMasterOpen]  = useState(isMasterActive);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showPwModal, setShowPwModal] = useState(false);
+  const [pwForm, setPwForm] = useState({ current:'', next:'', confirm:'' });
+  const [pwError, setPwError] = useState('');
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwDone,   setPwDone]   = useState(false);
+
+  const handleChangePw = async () => {
+    setPwError('');
+    if (!pwForm.current) return setPwError('Masukkan password saat ini.');
+    if (pwForm.next.length < 6) return setPwError('Password baru minimal 6 karakter.');
+    if (pwForm.next !== pwForm.confirm) return setPwError('Konfirmasi password tidak cocok.');
+    setPwSaving(true);
+    try {
+      await changePassword(pwForm.current, pwForm.next);
+      setPwDone(true);
+      setTimeout(() => { setShowPwModal(false); setPwDone(false); setPwForm({ current:'', next:'', confirm:'' }); }, 2000);
+    } catch (err) {
+      setPwError(
+        err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential'
+          ? 'Password saat ini salah.'
+          : err.code === 'auth/too-many-requests'
+          ? 'Terlalu banyak percobaan. Coba lagi nanti.'
+          : 'Gagal mengubah password. Coba lagi.'
+      );
+    } finally { setPwSaving(false); }
+  };
 
   const allowedRoutes = ROLE_MENU[userRole] || ROLE_MENU.staff;
   const visibleNav = ALL_NAV.filter(n => allowedRoutes.some(r => r === n.to));
@@ -102,6 +128,10 @@ export default function Sidebar() {
           </span>
           <p className="text-blue-400 text-[10px] truncate flex-1">{user?.email}</p>
         </div>
+        <button onClick={() => { setShowPwModal(true); closeSidebar(); }}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-blue-200 hover:bg-blue-800 hover:text-white transition-colors">
+          <span>🔑</span> Ganti Password
+        </button>
         <button onClick={() => logout()}
           className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-blue-200 hover:bg-blue-800 hover:text-white transition-colors">
           <span>🔓</span> Keluar
@@ -125,6 +155,62 @@ export default function Sidebar() {
       <aside className="no-print hidden md:flex md:flex-col md:w-56 md:shrink-0 h-full">
         <SidebarContent />
       </aside>
+
+      {/* Change Password Modal — rendered outside sidebar so it's always visible */}
+      {showPwModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+            <div className="flex items-center justify-between p-5 border-b">
+              <h2 className="font-bold text-gray-800">🔑 Ganti Password</h2>
+              <button onClick={() => { setShowPwModal(false); setPwError(''); setPwForm({current:'',next:'',confirm:''}); }}
+                className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-xs text-gray-400">{user?.email}</p>
+
+              {['current','next','confirm'].map((key, i) => (
+                <div key={key}>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    {key === 'current' ? 'Password Saat Ini' : key === 'next' ? 'Password Baru' : 'Konfirmasi Password Baru'}
+                  </label>
+                  <input
+                    type="password"
+                    value={pwForm[key]}
+                    onChange={e => setPwForm(p => ({ ...p, [key]: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && handleChangePw()}
+                    placeholder="••••••••"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  />
+                </div>
+              ))}
+
+              {pwError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-sm text-red-600">
+                  {pwError}
+                </div>
+              )}
+
+              {pwDone && (
+                <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-sm text-green-600 font-semibold">
+                  ✅ Password berhasil diubah!
+                </div>
+              )}
+
+              <button onClick={handleChangePw} disabled={pwSaving || pwDone}
+                className="w-full bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-50">
+                {pwSaving ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"/>
+                    Mengubah…
+                  </span>
+                ) : pwDone ? '✅ Selesai' : 'Ubah Password'}
+              </button>
+
+              <p className="text-xs text-gray-400 text-center">Password minimal 6 karakter.</p>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

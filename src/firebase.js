@@ -11,6 +11,9 @@ import {
   onAuthStateChanged,
   setPersistence,
   browserLocalPersistence,
+  reauthenticateWithCredential,
+  updatePassword,
+  EmailAuthProvider,
 } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -33,6 +36,14 @@ setPersistence(auth, browserLocalPersistence).catch(() => {});
 export const login   = (email, pw) => signInWithEmailAndPassword(auth, email, pw);
 export const logout  = ()          => signOut(auth);
 export const onAuth  = (cb)        => onAuthStateChanged(auth, cb);
+
+// Change password — requires current password for re-authentication
+export const changePassword = async (currentPw, newPw) => {
+  const user       = auth.currentUser;
+  const credential = EmailAuthProvider.credential(user.email, currentPw);
+  await reauthenticateWithCredential(user, credential); // throws if wrong password
+  await updatePassword(user, newPw);
+};
 
 // ─── Firestore refs ───────────────────────────────────────────────────────────
 export const DATA_REF   = () => doc(db, 'gpp', 'data');
