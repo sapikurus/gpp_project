@@ -132,6 +132,16 @@ export default function Sidebar() {
           className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-blue-200 hover:bg-blue-800 hover:text-white transition-colors">
           <span>🔑</span> Ganti Password
         </button>
+        <div className="flex gap-1 px-3">
+          <a href="/manual-id.html" target="_blank" rel="noopener"
+            className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs text-blue-300 hover:bg-blue-800 hover:text-white transition-colors border border-blue-800">
+            📖 Panduan
+          </a>
+          <a href="/manual-en.html" target="_blank" rel="noopener"
+            className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs text-blue-300 hover:bg-blue-800 hover:text-white transition-colors border border-blue-800">
+            📖 Manual
+          </a>
+        </div>
         <button onClick={() => logout()}
           className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-blue-200 hover:bg-blue-800 hover:text-white transition-colors">
           <span>🔓</span> Keluar

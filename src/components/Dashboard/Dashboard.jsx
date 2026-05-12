@@ -69,7 +69,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Pending Approval Tasks ── */}
-      {pendingItems.length > 0 && (
+      {pendingItems.length > 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-amber-200 mb-6 overflow-hidden">
           <div className="flex items-center justify-between px-5 py-3 bg-amber-50 border-b border-amber-100">
             <div className="flex items-center gap-2">
@@ -106,6 +106,11 @@ export default function Dashboard() {
               );
             })}
           </div>
+        </div>
+      ) : !loading && (
+        <div className="bg-green-50 border border-green-200 rounded-xl px-5 py-3 mb-6 flex items-center gap-3">
+          <span className="text-lg">✅</span>
+          <p className="text-green-700 text-sm font-medium">Tidak ada tugas tertunggak — semua dokumen telah diproses.</p>
         </div>
       )}
 

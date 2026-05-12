@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>GPP Portal — Panduan Pengguna</title>
+<style>
+  :root { --blue:#1d4ed8; --blue-l:#dbeafe; --gray:#374151; --border:#e5e7eb; --amber:#d97706; --green:#059669; --red:#dc2626; }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',system-ui,sans-serif;color:var(--gray);background:#fff;font-size:14px;line-height:1.6;}
+  .layout{display:flex;min-height:100vh;}
+  nav{width:260px;min-width:260px;background:#1e293b;color:#cbd5e1;position:sticky;top:0;height:100vh;overflow-y:auto;padding:24px 0;}
+  main{flex:1;padding:40px 56px;max-width:900px;}
+  .nav-logo{padding:0 20px 20px;border-bottom:1px solid #334155;margin-bottom:12px;}
+  .nav-logo .name{font-size:13px;font-weight:700;color:#f1f5f9;}
+  .nav-logo .sub{font-size:11px;color:#64748b;margin-top:2px;}
+  nav a{display:block;padding:6px 20px;font-size:12px;color:#94a3b8;text-decoration:none;transition:color .15s;}
+  nav a:hover{color:#f1f5f9;}
+  nav a.active{color:#60a5fa;font-weight:600;}
+  .nav-section{padding:12px 20px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#475569;}
+  nav a.indent{padding-left:32px;font-size:11px;}
+  .lang-switch{padding:12px 20px;border-top:1px solid #334155;margin-top:8px;}
+  .lang-switch a{display:inline-block;font-size:11px;color:#64748b;padding:3px 8px;border:1px solid #334155;border-radius:4px;text-decoration:none;margin-right:6px;}
+  .lang-switch a:hover{color:#f1f5f9;border-color:#64748b;}
+  .lang-switch a.cur{color:#60a5fa;border-color:#3b82f6;}
+  h1{font-size:28px;font-weight:800;color:#1e293b;margin-bottom:6px;}
+  h2{font-size:20px;font-weight:700;color:#1e293b;margin:40px 0 12px;padding-top:40px;border-top:2px solid var(--border);}
+  h2:first-of-type{border-top:none;margin-top:20px;padding-top:0;}
+  h3{font-size:15px;font-weight:700;color:var(--blue);margin:24px 0 8px;}
+  h4{font-size:13px;font-weight:600;color:#374151;margin:16px 0 6px;}
+  p{margin-bottom:10px;}
+  ul,ol{margin:8px 0 12px 20px;}
+  li{margin-bottom:4px;}
+  strong{color:#1e293b;}
+  code{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;padding:1px 6px;font-family:monospace;font-size:12px;color:#0f172a;}
+  .cover{background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 100%);color:white;padding:48px 56px;margin:-40px -56px 40px;}
+  .cover h1{color:white;font-size:36px;}
+  .cover .sub{font-size:15px;color:#bfdbfe;margin-top:8px;}
+  .cover .meta{margin-top:24px;display:flex;gap:32px;font-size:12px;color:#93c5fd;}
+  .cover .meta strong{color:white;display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;}
+  .callout{border-radius:8px;padding:14px 16px;margin:16px 0;display:flex;gap:12px;}
+  .callout .icon{font-size:18px;flex-shrink:0;margin-top:1px;}
+  .callout p{margin:0;}
+  .callout.info{background:#eff6ff;border:1px solid #bfdbfe;}
+  .callout.warn{background:#fffbeb;border:1px solid #fde68a;}
+  .callout.tip{background:#ecfdf5;border:1px solid #a7f3d0;}
+  .callout.danger{background:#fef2f2;border:1px solid #fecaca;}
+  .steps{counter-reset:step;margin:12px 0;}
+  .step{display:flex;gap:16px;margin-bottom:14px;}
+  .step::before{counter-increment:step;content:counter(step);background:var(--blue);color:white;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;margin-top:1px;}
+  .step-body{flex:1;}
+  .step-body p{margin:0;}
+  .step-body small{color:#6b7280;font-size:12px;}
+  table{width:100%;border-collapse:collapse;margin:12px 0 20px;font-size:13px;}
+  th{background:#1e3a8a;color:white;text-align:left;padding:10px 12px;font-weight:600;font-size:12px;}
+  td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;}
+  tr:hover td{background:#f8fafc;}
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:99px;}
+  .badge.draft{background:#f1f5f9;color:#64748b;}
+  .badge.pending{background:#fef9c3;color:#854d0e;}
+  .badge.approved{background:#dcfce7;color:#166534;}
+  .badge.rejected{background:#fee2e2;color:#991b1b;}
+  .badge.blue{background:#dbeafe;color:#1e40af;}
+  .role-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0;}
+  .role-card{border:1px solid var(--border);border-radius:8px;padding:14px 16px;}
+  .role-card .role-name{font-weight:700;font-size:13px;margin-bottom:6px;}
+  .role-card.admin .role-name{color:#7c3aed;}
+  .role-card.director .role-name{color:var(--blue);}
+  .role-card.manager .role-name{color:#0d9488;}
+  .role-card.staff .role-name{color:#6b7280;}
+  @media print{nav{display:none;}main{padding:20px;max-width:100%;}.cover{margin:-20px -20px 30px;padding:30px;}h2{page-break-before:always;}h2:first-of-type{page-break-before:avoid;}}
+  @media(max-width:768px){nav{display:none;}main{padding:24px 20px;}.role-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <div class="nav-logo">
+    <div class="name">GPP Portal</div>
+    <div class="sub">Panduan Pengguna v1.0</div>
+  </div>
+  <a href="#ikhtisar">Ikhtisar</a>
+  <a href="#mulai">Memulai</a>
+  <div class="nav-section">Modul</div>
+  <a href="#dashboard">Dashboard</a>
+  <a href="#stok" class="indent">Stok</a>
+  <a href="#kalkulator" class="indent">Kalkulator</a>
+  <a href="#sph" class="indent">Surat Penawaran</a>
+  <a href="#so" class="indent">Sales Order</a>
+  <a href="#po" class="indent">Purchase Order</a>
+  <a href="#do" class="indent">Delivery Order</a>
+  <a href="#mops" class="indent">Data MOPS</a>
+  <div class="nav-section">Administrasi</div>
+  <a href="#master">Master Data</a>
+  <a href="#korporat" class="indent">Korporat</a>
+  <a href="#klien" class="indent">Klien</a>
+  <a href="#supplier" class="indent">Supplier</a>
+  <a href="#pengaturan" class="indent">Pengaturan</a>
+  <a href="#peran">Peran & Hak Akses</a>
+  <a href="#approval">Alur Persetujuan</a>
+  <div class="nav-section">Referensi</div>
+  <a href="#konsep">Konsep Utama</a>
+  <a href="#nomor">Nomor Dokumen</a>
+  <a href="#troubleshoot">Pemecahan Masalah</a>
+  <div class="lang-switch">
+    <a href="manual-id.html" class="cur">🇮🇩 ID</a>
+    <a href="manual-en.html">🇬🇧 EN</a>
+  </div>
+</nav>
+<main>
+
+<div class="cover">
+  <h1>GPP Portal</h1>
+  <div class="sub">Panduan Pengguna — PT Global Petro Pasifik</div>
+  <div class="meta">
+    <div><strong>Versi</strong>1.0 — Mei 2026</div>
+    <div><strong>Platform</strong>Web / Mobile (PWA)</div>
+    <div><strong>Administrator</strong>nico@kairenecosolution.com</div>
+  </div>
+</div>
+
+<h2 id="ikhtisar">1. Ikhtisar</h2>
+<p><strong>GPP Portal</strong> adalah sistem operasional perdagangan bahan bakar internal PT Global Petro Pasifik. Sistem ini mencakup siklus perdagangan BBM secara lengkap — dari pengadaan supply dan manajemen stok, kalkulasi harga, surat penawaran, sales order, purchase order, hingga dokumentasi pengiriman.</p>
+
+<h3>Apa yang Dilakukan GPP Portal</h3>
+<table>
+  <tr><th>Modul</th><th>Fungsi</th></tr>
+  <tr><td><strong>Stok</strong></td><td>Pantau posisi kargo masuk dan supply tranches dari berbagai supplier</td></tr>
+  <tr><td><strong>Kalkulator</strong></td><td>Analisis P&L real-time — harga blended, cost of money, margin</td></tr>
+  <tr><td><strong>Surat Penawaran</strong></td><td>Buat surat penawaran harga resmi ke klien dengan rincian pajak lengkap</td></tr>
+  <tr><td><strong>Sales Order</strong></td><td>Formalisasi komitmen klien yang terhubung ke surat penawaran dan stok</td></tr>
+  <tr><td><strong>Purchase Order</strong></td><td>Terbitkan order pembelian ke supplier dengan alur persetujuan</td></tr>
+  <tr><td><strong>Delivery Order</strong></td><td>Terbitkan surat jalan dan BDR pengiriman</td></tr>
+  <tr><td><strong>Data MOPS</strong></td><td>Data harga MOPS, JISDOR, dan referensi harga Pertamina dua mingguan</td></tr>
+  <tr><td><strong>Master Data</strong></td><td>Profil perusahaan, database klien, supplier, produk, tarif pajak</td></tr>
+</table>
+
+<h3>Prinsip Desain Sistem</h3>
+<ul>
+  <li><strong>PPN bersifat pass-through</strong> — PPN tidak pernah masuk dalam kalkulasi laba. PPN dipungut dari klien dan disetorkan ke pemerintah; GPP mengkreditkan PPN masukan terhadap PPN keluaran.</li>
+  <li><strong>Harga blended dihitung berdasarkan bobot volume</strong> — saat kargo memiliki beberapa supply tranches dengan harga berbeda, kalkulator membobot rata-ratanya secara proporsional berdasarkan volume.</li>
+  <li><strong>Semua persetujuan berbasis peran</strong> — dokumen melewati rantai persetujuan yang dapat dikonfigurasi sebelum menjadi final.</li>
+  <li><strong>Data tidak hilang saat berpindah halaman</strong> — data penting (klien, supplier) langsung tersimpan ke Firestore saat diinput.</li>
+</ul>
+
+<h2 id="mulai">2. Memulai</h2>
+
+<h3>Login</h3>
+<div class="steps">
+  <div class="step"><div class="step-body"><p>Buka <code>gpp-project.vercel.app</code> (atau domain kustom yang dikonfigurasi).</p></div></div>
+  <div class="step"><div class="step-body"><p>Masukkan email dan password. Akun harus dibuat di Firebase Authentication oleh administrator.</p></div></div>
+  <div class="step"><div class="step-body"><p>Setelah login, peran Anda dimuat otomatis dari database. Anda hanya akan melihat menu yang sesuai peran Anda.</p></div></div>
+</div>
+
+<div class="callout info">
+  <span class="icon">ℹ️</span>
+  <p>Login pertama kali: hubungi administrator <strong>nico@kairenecosolution.com</strong> untuk pembuatan akun Firebase dan penetapan peran di Master Data → Pengaturan → Users & Roles. Sebelum peran ditetapkan, Anda akan berstatus <strong>Staff</strong> secara default.</p>
+</div>
+
+<h3>Mengganti Password</h3>
+<div class="steps">
+  <div class="step"><div class="step-body"><p>Klik <strong>🔑 Ganti Password</strong> di bagian bawah sidebar kiri.</p></div></div>
+  <div class="step"><div class="step-body"><p>Masukkan password saat ini, password baru (minimal 6 karakter), lalu konfirmasi password baru.</p></div></div>
+  <div class="step"><div class="step-body"><p>Klik <strong>Ubah Password</strong>. Konfirmasi ✅ akan muncul. Password langsung berubah.</p><small>Firebase memerlukan autentikasi ulang — jika password saat ini salah, akan muncul pesan error.</small></div></div>
+</div>
+
+<h3>Instalasi sebagai Aplikasi Mobile (PWA)</h3>
+<p>GPP Portal adalah Progressive Web App. Di perangkat mobile:</p>
+<ul>
+  <li><strong>Android (Chrome):</strong> tap menu (⋮) → "Tambahkan ke layar beranda"</li>
+  <li><strong>iOS (Safari):</strong> tap ikon Bagikan → "Tambahkan ke Layar Utama"</li>
+</ul>
+<p>Setelah diinstal, GPP Portal terbuka seperti aplikasi native tanpa bilah browser.</p>
+
+<h2 id="dashboard">3. Dashboard</h2>
+<p>Dashboard adalah layar pertama setelah login. Dashboard memberikan ringkasan operasional sekilas dan menginformasikan dokumen yang menunggu persetujuan Anda.</p>
+
+<h3>Panel Tugas Tertunggak</h3>
+<p>Panel amber di bagian atas menampilkan semua dokumen yang menunggu persetujuan sesuai peran Anda. Setiap item menampilkan:</p>
+<ul>
+  <li>Jenis dokumen (kode warna: ungu = PO, biru = SO, amber = OL)</li>
+  <li>Nomor dokumen dan nama vendor/klien</li>
+  <li>Badge status saat ini (mis. "Menunggu Manager")</li>
+  <li>Tombol <strong>Buka →</strong> — langsung mengarah ke modul terkait</li>
+</ul>
+<div class="callout tip">
+  <span class="icon">✅</span>
+  <p>Jika tidak ada tugas tertunggak, panel menampilkan pesan hijau konfirmasi "Tidak ada tugas tertunggak." Ini berarti semua dokumen telah diproses — bukan error sistem.</p>
+</div>
+
+<h3>Kartu Statistik</h3>
+<table>
+  <tr><th>Kartu</th><th>Menampilkan</th></tr>
+  <tr><td>Stok Tersedia</td><td>Total volume tersedia (belum terikat SO) dalam liter di semua stok Confirmed</td></tr>
+  <tr><td>Terikat SO</td><td>Volume yang dikomit ke Sales Order yang disetujui</td></tr>
+  <tr><td>Total PO</td><td>Jumlah Purchase Order; badge merah menunjukkan berapa yang menunggu persetujuan Anda</td></tr>
+  <tr><td>Delivery Orders</td><td>Total Delivery Order yang diterbitkan</td></tr>
+</table>
+
+<h2 id="stok">4. Stok (Posisi Kargo)</h2>
+<p>Modul Stok melacak posisi supply masuk. Setiap posisi dapat memiliki beberapa <strong>tranches</strong> — pengiriman terpisah dari supplier, kapal, atau tanggal pembelian berbeda yang membentuk satu kargo tergabung.</p>
+
+<h3>Tampilan Layout</h3>
+<ul>
+  <li><strong>Panel kiri:</strong> Daftar semua posisi kargo. Klik kartu mana saja untuk melihat detailnya.</li>
+  <li><strong>Panel kanan:</strong> Statistik posisi terpilih, tabel tranche, dan PO terhubung.</li>
+</ul>
+
+<h3>Membuat Posisi Baru</h3>
+<div class="steps">
+  <div class="step"><div class="step-body"><p>Klik <strong>+ New Position</strong> di panel kiri.</p></div></div>
+  <div class="step"><div class="step-body"><p>Isi label deskriptif (mis. "Batam P1 MEI 2026"), jenis produk, loading port, discharging port, dan tanggal ETA.</p></div></div>
+  <div class="step"><div class="step-body"><p>Klik <strong>+ Create Position</strong>. Stok dibuat dengan status Draft tanpa tranche.</p></div></div>
+</div>
+
+<h3>Menambahkan Tranche</h3>
+<div class="steps">
+  <div class="step"><div class="step-body"><p>Dengan stok terpilih, klik <strong>+ Add Tranche</strong> di pojok kanan atas panel detail.</p></div></div>
+  <div class="step"><div class="step-body"><p>Isi detail tranche:
+    <ul>
+      <li><strong>Supplier</strong> — dari siapa Anda membeli</li>
+      <li><strong>Vessel / SPOB</strong> — kapal pengiriman untuk tranche ini</li>
+      <li><strong>Harga Dasar (IDR/L)</strong> — harga beli sebelum pajak</li>
+      <li><strong>Volume (L)</strong> — kuantitas dalam liter</li>
+      <li><strong>Tanggal Loading</strong> — saat produk dimuat/diterima</li>
+      <li><strong>Tanggal Bayar</strong> — saat pembayaran ke supplier (digunakan untuk CoM)</li>
+      <li><strong>Provinsi</strong> — provinsi supplier (menentukan tarif PBBKB)</li>
+    </ul>
+  </p></div></div>
+  <div class="step"><div class="step-body"><p>Pilih pajak yang berlaku dari supplier:
+    <ul>
+      <li><strong>PPN</strong> — centang jika supplier membebankan PPN. <em>Catatan: PPN TIDAK memengaruhi Modal/L atau kalkulasi laba — ini pass-through.</em></li>
+      <li><strong>BPH Migas</strong> — centang jika supplier membebankan pungutan ini (0,25%)</li>
+      <li><strong>PBBKB</strong> — centang jika supplier membebankan pajak BBM untuk provinsinya. Centang "Omit PBBKB" jika supplier bukan Wapu/bukan PKP.</li>
+    </ul>
+  </p></div></div>
+  <div class="step"><div class="step-body"><p>Secara opsional, hubungkan Purchase Order (lihat di bawah). Klik <strong>💾 Save Tranche</strong>.</p></div></div>
+</div>
+
+<div class="callout warn">
+  <span class="icon">⚠️</span>
+  <p><strong>PPN bersifat pass-through.</strong> Meskipun supplier membebankan PPN 11%, sistem tidak memasukkannya ke Modal/L dan harga blended. Ini benar — GPP mengkreditkan PPN masukan terhadap PPN keluaran yang dibebankan ke klien.</p>
+</div>
+
+<h3>Menghubungkan PO ke Tranche</h3>
+<p>Setelah Purchase Order dibuat, Anda dapat menghubungkannya ke tranche terkait untuk memvalidasi harga dan volume:</p>
+<div class="steps">
+  <div class="step"><div class="step-body"><p>Edit tranche yang ada (arahkan kursor ke baris → klik <strong>Edit</strong>).</p></div></div>
+  <div class="step"><div class="step-body"><p>Di bagian "Link ke Purchase Order", pilih PO dari dropdown.</p></div></div>
+  <div class="step"><div class="step-body"><p>Sistem membandingkan harga dan volume tranche dengan item PO. Anda akan melihat:
+    <ul>
+      <li>✅ <strong>Harga dan volume sesuai PO</strong> — semua benar</li>
+      <li>⚠️ <strong>Tidak sesuai PO</strong> — dengan perbedaan yang ditampilkan. Gunakan <strong>↓ Prefill dari PO</strong> untuk menyinkronkan.</li>
+    </ul>
+  </p></div></div>
+  <div class="step"><div class="step-body"><p>Simpan tranche. Stok otomatis berubah ke status <strong>Confirmed</strong> saat ada tranche dengan PO terhubung.</p></div></div>
+</div>
+
+<div class="callout info">
+  <span class="icon">💡</span>
+  <p><strong>Tips alur kerja:</strong> Trader sering memodelkan tranches sebelum berkomitmen ke PO. Anda bisa membuat stok dengan tranches untuk kalkulasi P&L cepat, lalu membuat PO (yang memicu alur persetujuan), dan menghubungkannya ke tranche setelah disetujui. Kolom tranche tidak pernah dikunci — tetap dapat diedit meskipun sudah ada PO terhubung.</p>
+</div>
+
+<h3>Status Stok</h3>
+<table>
+  <tr><th>Status</th><th>Arti</th></tr>
+  <tr><td><span class="badge draft">Draft</span></td><td>Stok dibuat, tranche dimodelkan, belum ada PO terhubung. Digunakan untuk kalkulasi/perencanaan.</td></tr>
+  <tr><td><span class="badge blue">Confirmed</span></td><td>Setidaknya satu tranche terhubung ke Purchase Order. Inventaris nyata yang berkomitmen.</td></tr>
+  <tr><td><span class="badge approved">Sold Out</span></td><td>Volume SO yang dikomit sama atau melebihi total volume stok. Diset otomatis.</td></tr>
+  <tr><td><span class="badge draft">Closed</span></td><td>Ditutup secara manual. Tidak ada transaksi lebih lanjut.</td></tr>
+</table>
+
+<h3>Membaca Tabel Tranche</h3>
+<table>
+  <tr><th>Kolom</th><th>Arti</th></tr>
+  <tr><td>Supplier</td><td>Dari siapa Anda membeli</td></tr>
+  <tr><td>Vessel</td><td>Kapal/SPOB pengiriman untuk tranche ini</td></tr>
+  <tr><td>Base Price</td><td>Harga beli sebelum pajak (IDR/L)</td></tr>
+  <tr><td>Volume (L)</td><td>Kuantitas dalam liter</td></tr>
+  <tr><td>Load Date</td><td>Tanggal loading fisik (digunakan untuk awal CoM)</td></tr>
+  <tr><td>Province</td><td>Provinsi supplier (yurisdiksi PBBKB)</td></tr>
+  <tr><td>Taxes</td><td>Pajak biaya aktif: BPH, PBBKB (PPN ditampilkan sebagai pass-through)</td></tr>
+  <tr><td>Modal/L</td><td>Biaya efektif per liter = Dasar + PBBKB + BPH (PPN dikecualikan)</td></tr>
+  <tr><td>Badge PO</td><td>✅ sesuai / ⚠️ tidak sesuai / kosong = belum terhubung</td></tr>
+</table>
+<p>Baris <strong>Blended (volume-weighted)</strong> di footer tabel menunjukkan rata-rata tertimbang gabungan — inilah yang digunakan Kalkulator sebagai harga beli.</p>
+
+<h2 id="kalkulator">5. Kalkulator</h2>
+<p>Kalkulator adalah alat pemodelan P&L utama. Kalkulator menghitung analisis margin secara real-time untuk posisi kargo dan skenario penjualan tertentu.</p>
+
+<h3>Memuat Posisi Kargo</h3>
+<div class="steps">
+  <div class="step"><div class="step-body"><p>Klik <strong>Prefill dari Stok</strong> (atau navigasi dari modul Stok via tombol 🧮 Kalkulasi) untuk memuat tranches kargo secara otomatis.</p></div></div>
+  <div class="step"><div class="step-body"><p>Atau, masukkan tranches secara manual di panel Cargo Position sebelah kiri.</p></div></div>
+</div>
+
+<h3>Mengatur Harga Jual</h3>
+<p>Dua mode harga jual tersedia:</p>
+<ul>
+  <li><strong>Direct</strong> — masukkan harga jual yang disepakati (IDR/L) secara langsung.</li>
+  <li><strong>Formula MOPS</strong> — harga jual dihitung dari: <code>(MOPS × JISDOR / 158,987 + Premium) × Bobot% + HIP BBN × (1 - Bobot%)</code>. Berguna untuk kontrak berbasis MOPS.</li>
+</ul>
+
+<h3>Memahami Output P&L</h3>
+<table>
+  <tr><th>Baris</th><th>Penjelasan</th></tr>
+  <tr><td>Blended Buy (Modal)</td><td>Rata-rata biaya efektif tertimbang per liter (tidak termasuk PPN)</td></tr>
+  <tr><td>Cost of Money (CoM)</td><td>Biaya pembiayaan dari tanggal loading hingga tanggal pembayaran. Compound: <code>Modal × ((1 + rate)^(hari/365) − 1)</code></td></tr>
+  <tr><td>Loss (Susut)</td><td>Toleransi susut volume atas harga jual. <code>Jual × susut%</code></td></tr>
+  <tr><td>Margin BBM</td><td>Jual − Modal − CoM − Susut</td></tr>
+  <tr><td>OAT Modal</td><td>Biaya freight/logistik Anda per liter</td></tr>
+  <tr><td>OAT Klien</td><td>Freight yang dibebankan ke klien per liter</td></tr>
+  <tr><td>Margin Freight</td><td>OAT Klien − OAT Modal</td></tr>
+  <tr><td>Total Margin</td><td>Margin BBM + Margin Freight</td></tr>
+</table>
+
+<h3>Bagian Invoice Klien</h3>
+<ul>
+  <li><strong>DPP</strong> — harga jual per liter, dasar pengenaan pajak</li>
+  <li><strong>PBBKB</strong> — pajak BBM yang dibebankan ke klien (jika GPP terdaftar di provinsi pengiriman)</li>
+  <li><strong>PPN 11%</strong> — PPN keluaran yang dibebankan ke klien (pass-through)</li>
+  <li><strong>OAT Klien</strong> — biaya freight</li>
+  <li><strong>Klien Bayar</strong> — total per liter yang sebenarnya dibayar klien</li>
+</ul>
+
+<h3>Menyimpan Snapshot</h3>
+<p>Klik <strong>💾 Simpan Kalkulasi</strong> untuk menyimpan kalkulasi saat ini sebagai snapshot permanen. Snapshot dapat dipanggil kembali untuk referensi atau melanjutkan pengeditan.</p>
+
+<h2 id="sph">6. Surat Penawaran Harga</h2>
+<p>Modul Surat Penawaran menghasilkan surat penawaran harga (SPH) resmi kepada klien.</p>
+
+<h3>Membuat Surat Baru</h3>
+<div class="steps">
+  <div class="step"><div class="step-body"><p>Klik <strong>+ New Letter</strong>. Formulir halaman penuh terbuka.</p></div></div>
+  <div class="step"><div class="step-body"><p>Kolom <strong>Sequence No.</strong> terisi otomatis dengan nomor berikutnya. Anda dapat menggantinya menggunakan stepper − / +. Pratinjau nomor dokumen diperbarui secara langsung di header.</p></div></div>
+  <div class="step"><div class="step-body"><p>Pilih <strong>Klien</strong> dari dropdown. Detail klien (nama, kode, alamat) diambil otomatis dari Master Data.</p></div></div>
+  <div class="step"><div class="step-body"><p><strong>Periode</strong> terisi otomatis dengan periode harga Pertamina dua mingguan saat ini (mis. "1 - 14 Mei 2026"). Edit jika diperlukan.</p></div></div>
+  <div class="step"><div class="step-body"><p>Pilih <strong>Provinsi (PBBKB)</strong> — ini adalah provinsi pengiriman klien, yang menentukan apakah PBBKB berlaku di sisi jual.</p></div></div>
+  <div class="step"><div class="step-body"><p>Atur <strong>Terms of Payment</strong>: Credit (dengan hari TOP) · CBD · COD · Lainnya (teks bebas).</p></div></div>
+  <div class="step"><div class="step-body"><p>Di kolom <strong>Price</strong>, masukkan DPP/L dan pilih pajak yang berlaku:
+    <ul>
+      <li><strong>PPN</strong> — PPN keluaran (11%). Dibebankan ke klien, pass-through ke otoritas pajak.</li>
+      <li><strong>PPH</strong> — pajak penghasilan (0,3%). Menjadi beban pembeli.</li>
+      <li><strong>PBBKB</strong> — pajak BBM. Centang ini, dan tarif untuk provinsi yang dipilih akan muncul. Hanya berlaku jika GPP terdaftar (✓) di provinsi tersebut.</li>
+    </ul>
+  </p></div></div>
+  <div class="step"><div class="step-body"><p>Tambahkan <strong>Transport Sites (OAT)</strong> jika ada — setiap site memiliki nama dan tarif IDR/L yang dibebankan ke klien.</p></div></div>
+  <div class="step"><div class="step-body"><p>Klik <strong>📄 Buat Surat</strong>. Surat disimpan dengan status Draft.</p></div></div>
+</div>
+
+<h3>Format Nomor Dokumen</h3>
+<p><code>001/SPH/GPP/PTRO/V/2026</code></p>
+<ul>
+  <li><code>001</code> — 3 digit sekuens (dapat diedit)</li>
+  <li><code>SPH</code> — penanda tetap</li>
+  <li><code>GPP</code> — entitas</li>
+  <li><code>PTRO</code> — kode klien (diatur di Master Data → Klien)</li>
+  <li><code>V</code> — bulan dalam angka Romawi</li>
+  <li><code>2026</code> — tahun</li>
+</ul>
+
+<h3>Opsi Computer Generated</h3>
+<p>Aktifkan <strong>"Computer Generated — No Signature Required"</strong> di kartu Opsi Dokumen. Saat dicetak, blok tanda tangan diganti dengan pernyataan bahwa dokumen dibuat secara elektronik dan sah tanpa tanda tangan basah.</p>
+
+<h2 id="so">7. Sales Order</h2>
+<p>Sales Order (SO) memformalisasi komitmen klien untuk membeli. SO terhubung ke Surat Penawaran (opsional) dan mereservasi volume stok.</p>
+
+<h3>Membuat Sales Order</h3>
+<div class="steps">
+  <div class="step"><div class="step-body"><p>Klik <strong>+ SO Baru</strong>.</p></div></div>
+  <div class="step"><div class="step-body"><p>Secara opsional pilih <strong>Surat Penawaran</strong> dari dropdown. Ini akan mengisi otomatis: nama klien, produk, harga yang disepakati (DPP), provinsi pengiriman, dan terms pembayaran dari OL.</p></div></div>
+  <div class="step"><div class="step-body"><p>Pilih <strong>Stok</strong> — hanya stok Confirmed yang muncul, dengan volume tersedia ditampilkan.</p></div></div>
+  <div class="step"><div class="step-body"><p>Masukkan volume, harga yang disepakati, lokasi pengiriman, dan terms pembayaran.</p></div></div>
+  <div class="step"><div class="step-body"><p>Klik <strong>+ Buat SO</strong>.</p></div></div>
+</div>
+
+<h3>SO dan Volume Stok</h3>
+<p>Saat Sales Order mendapatkan <strong>persetujuan final</strong> (approver terakhir menyetujui), sistem menjalankan <strong>transaksi Firestore</strong> yang:</p>
+<ol>
+  <li>Mengubah status SO menjadi <code>approved</code></li>
+  <li>Menambahkan volume SO ke <code>committedVolume</code> stok</li>
+  <li>Jika volume yang dikomit ≥ total volume, stok ditandai sebagai <strong>Sold Out</strong></li>
+</ol>
+
+<h2 id="po">8. Purchase Order</h2>
+<p>Purchase Order diterbitkan ke supplier untuk pengadaan BBM. Setiap PO melewati rantai persetujuan sebelum dianggap mengikat.</p>
+
+<h3>Membuat PO</h3>
+<div class="steps">
+  <div class="step"><div class="step-body"><p>Klik <strong>+ New Entry</strong>.</p></div></div>
+  <div class="step"><div class="step-body"><p>Pilih supplier dari dropdown (nama, alamat, NPWP terisi otomatis dari Master Data), atau masukkan secara manual.</p></div></div>
+  <div class="step"><div class="step-body"><p>Tambahkan item baris: deskripsi, kuantitas, satuan, harga satuan, diskon. Beberapa item didukung.</p></div></div>
+  <div class="step"><div class="step-body"><p>Di <strong>Pajak & Pungutan</strong>, pilih pajak yang berlaku: PPH, BPH Migas, PBBKB (dengan provinsi).</p></div></div>
+  <div class="step"><div class="step-body"><p>Sidebar <strong>Ringkasan</strong> diperbarui secara langsung dengan subtotal dan total.</p></div></div>
+  <div class="step"><div class="step-body"><p>Klik <strong>+ Buat PO</strong>. PO disimpan dalam status Draft — harus diajukan untuk persetujuan sebelum dianggap mengikat.</p></div></div>
+</div>
+
+<h3>Persetujuan PO</h3>
+<p>Arahkan kursor ke baris PO di daftar → klik <strong>Approval</strong>. Panel persetujuan terbuka di mana Anda dapat mengajukan, menyetujui, atau menolak dokumen sesuai peran Anda.</p>
+
+<h2 id="do">9. Delivery Order</h2>
+<p>Modul Delivery Order melacak pengiriman produk dan menghasilkan:</p>
+<ul>
+  <li><strong>Surat Jalan</strong> — menyertai pengiriman fisik</li>
+  <li><strong>BDR</strong> (Berita Acara Delivery Receipt) — konfirmasi penerimaan</li>
+</ul>
+<p>Nomor dokumen mengikuti format: <code>001/DO-GPP/V/2026</code> dan <code>001/BDR-GPP/V/2026</code>.</p>
+
+<h2 id="mops">10. Data MOPS</h2>
+<p>Modul Data MOPS menampilkan data referensi harga langsung yang diambil dari Google Apps Script (GAS) Web App yang terhubung ke Google Sheet DATA MOPS perusahaan.</p>
+
+<h3>Data yang Tersedia</h3>
+<table>
+  <tr><th>Data</th><th>Sumber</th></tr>
+  <tr><td>JISDOR</td><td>Kurs tukar USD/IDR</td></tr>
+  <tr><td>MOPS 10ppm (USD/bbl + IDR/L)</td><td>Benchmark gasoil MOPS platts</td></tr>
+  <tr><td>MOPS 0,25%S (USD/bbl + IDR/L)</td><td>Benchmark sulfur MOPS</td></tr>
+  <tr><td>WTI</td><td>West Texas Intermediate crude</td></tr>
+  <tr><td>CPO KPBN</td><td>Referensi harga sawit (InfoSAWIT)</td></tr>
+  <tr><td>HIP Pertamina</td><td>Harga acuan yang diterbitkan dua mingguan (tab ringkasan)</td></tr>
+</table>
+
+<h3>Mengonfigurasi Endpoint</h3>
+<p>Buka <strong>Master Data → Pengaturan → MOPS Endpoint</strong>. Tempel URL Google Apps Script Web App. URL ini disimpan di Firebase dan digunakan oleh semua pengguna.</p>
+
+<h2 id="master">11. Master Data</h2>
+<p>Master Data adalah pusat konfigurasi sistem. Hanya dapat diakses oleh Direktur dan Super Admin.</p>
+
+<h3 id="korporat">Korporat</h3>
+<p>Konfigurasi profil perusahaan GPP:</p>
+<ul>
+  <li><strong>Informasi Umum</strong> — nama perusahaan, alamat kantor pusat, NPWP, penandatangan</li>
+  <li><strong>Cabang</strong> — tambahkan kantor cabang tanpa batas, masing-masing dengan NPWP sendiri</li>
+  <li><strong>Info Bank</strong> — beberapa rekening bank; tandai satu sebagai utama (★)</li>
+  <li><strong>Tarif & PBBKB</strong> — atur tarif pajak global (PPN %, PPH %, BPH Migas %, Bank Rate untuk CoM); konfigurasi tarif PBBKB per provinsi dan status registrasi GPP</li>
+</ul>
+<div class="callout warn">
+  <span class="icon">⚠️</span>
+  <p>Klik <strong>💾 Simpan</strong> di bagian atas section Korporat untuk menyimpan perubahan. Data Korporat menggunakan pendekatan "simpan semua".</p>
+</div>
+
+<h3 id="klien">Database Klien</h3>
+<p>Klien muncul sebagai dropdown di Surat Penawaran dan Sales Order.</p>
+<div class="steps">
+  <div class="step"><div class="step-body"><p>Klik <strong>+ New Entry</strong> untuk membuka formulir klien.</p></div></div>
+  <div class="step"><div class="step-body"><p>Isi: Nama Perusahaan, Kode Klien (mis. PTRO — digunakan dalam nomor surat), NPWP, Alamat (multi-baris, gunakan +/− untuk mengatur jumlah baris — setiap baris muncul terpisah di surat penawaran), Kontak/PIC, Email, TOP Default (hari).</p></div></div>
+  <div class="step"><div class="step-body"><p>Klik <strong>💾 Simpan</strong>. Data langsung tersimpan ke Firestore — berpindah halaman tidak akan menghilangkan data.</p></div></div>
+</div>
+
+<div class="callout info">
+  <span class="icon">ℹ️</span>
+  <p><strong>Kode Klien sangat penting.</strong> Kode ini menjadi bagian dari nomor surat penawaran (mis. <code>001/SPH/GPP/<strong>PTRO</strong>/V/2026</code>). Gunakan kode singkat dan konsisten untuk setiap klien.</p>
+</div>
+
+<h3 id="supplier">Database Supplier</h3>
+<p>Supplier muncul di formulir Purchase Order. Pola yang sama berlaku: klik + New Entry, isi formulir (nama, NPWP, alamat, PIC, email, telepon), dan klik 💾 Simpan. Data langsung tersimpan.</p>
+
+<h3 id="pengaturan">Pengaturan</h3>
+<h4>Users & Roles</h4>
+<p>Tambahkan email pengguna dan tetapkan perannya. Peran berlaku segera setelah login berikutnya (atau refresh halaman). Untuk menambahkan akun pengguna baru, buka <strong>Firebase Console → Authentication → Add user</strong> terlebih dahulu, lalu tetapkan perannya di sini.</p>
+
+<h4>Konfigurasi Rantai Persetujuan</h4>
+<p>Untuk setiap jenis dokumen (PO, SO, Surat Penawaran), pilih peran mana yang harus menyetujui:</p>
+<ul>
+  <li>☑ Manager + ☑ Direktur → persetujuan dua level (default)</li>
+  <li>☐ Manager + ☑ Direktur → hanya direktur (satu level)</li>
+</ul>
+
+<h4>Backup & Restore</h4>
+<ul>
+  <li>Export backup JSON lengkap semua data</li>
+  <li>Import/restore dari backup (counter tidak pernah direset oleh import)</li>
+</ul>
+
+<h2 id="peran">12. Peran & Hak Akses</h2>
+<div class="role-grid">
+  <div class="role-card admin">
+    <div class="role-name">🟣 Super Admin</div>
+    <ul>
+      <li>Semua izin</li>
+      <li>Akses ke semua modul termasuk Master Data</li>
+      <li>Dapat menyetujui dokumen di level mana pun</li>
+      <li>Dapat menghapus dokumen apa pun</li>
+    </ul>
+  </div>
+  <div class="role-card director">
+    <div class="role-name">🔵 Direktur</div>
+    <ul>
+      <li>Semua izin</li>
+      <li>Akses penuh termasuk Master Data</li>
+      <li>Approver final dalam rantai</li>
+      <li>Dapat menghapus dokumen</li>
+    </ul>
+  </div>
+  <div class="role-card manager">
+    <div class="role-name">🟢 Manager</div>
+    <ul>
+      <li>Akses ke semua modul operasional</li>
+      <li>Tidak ada akses Master Data</li>
+      <li>Approver level pertama dalam rantai</li>
+      <li>Dapat menghapus dokumen</li>
+    </ul>
+  </div>
+  <div class="role-card staff">
+    <div class="role-name">⚫ Staff</div>
+    <ul>
+      <li>Akses ke modul operasional</li>
+      <li>Tidak ada akses Master Data</li>
+      <li>Dapat membuat dan mengajukan dokumen</li>
+      <li>Tidak dapat menyetujui atau menghapus</li>
+    </ul>
+  </div>
+</div>
+
+<table>
+  <tr><th>Aksi</th><th>Staff</th><th>Manager</th><th>Direktur</th><th>Super Admin</th></tr>
+  <tr><td>Lihat semua modul</td><td>✅ (tanpa Master Data)</td><td>✅ (tanpa Master Data)</td><td>✅</td><td>✅</td></tr>
+  <tr><td>Buat & edit dokumen</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td></tr>
+  <tr><td>Ajukan untuk persetujuan</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td></tr>
+  <tr><td>Setujui level pertama (Manager)</td><td>❌</td><td>✅</td><td>✅</td><td>✅</td></tr>
+  <tr><td>Setujui final (Direktur)</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td></tr>
+  <tr><td>Hapus dokumen</td><td>❌</td><td>✅</td><td>✅</td><td>✅</td></tr>
+  <tr><td>Akses Master Data</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td></tr>
+  <tr><td>Manajemen peran pengguna</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td></tr>
+</table>
+
+<h2 id="approval">13. Alur Persetujuan</h2>
+<p>GPP Portal menggunakan sistem persetujuan multi-level yang dapat dikonfigurasi untuk Purchase Order, Sales Order, dan Surat Penawaran.</p>
+
+<h3>Status Persetujuan</h3>
+<table>
+  <tr><th>Status</th><th>Arti</th><th>Yang Dapat Bertindak</th></tr>
+  <tr><td><span class="badge draft">Draft</span></td><td>Dibuat, belum diajukan</td><td>Pembuat dapat mengedit dan mengajukan</td></tr>
+  <tr><td><span class="badge pending">Menunggu Manager</span></td><td>Diajukan, menunggu manager</td><td>Manager (atau Direktur)</td></tr>
+  <tr><td><span class="badge pending">Menunggu Direktur</span></td><td>Manager menyetujui, menunggu direktur</td><td>Direktur (atau Super Admin)</td></tr>
+  <tr><td><span class="badge approved">Disetujui</span></td><td>Disetujui sepenuhnya</td><td>Tidak dapat diedit lagi</td></tr>
+  <tr><td><span class="badge rejected">Ditolak</span></td><td>Ditolak di level mana pun</td><td>Kembali ke Draft untuk koreksi</td></tr>
+</table>
+
+<h3>Alur Persetujuan</h3>
+<div class="steps">
+  <div class="step"><div class="step-body"><p><strong>Staff/peran apa pun membuat</strong> dokumen dalam status Draft.</p></div></div>
+  <div class="step"><div class="step-body"><p>Mereka membuka panel <strong>Approval</strong> dokumen dan klik <strong>📤 Ajukan untuk Persetujuan</strong>. Status berubah ke "Menunggu Manager".</p></div></div>
+  <div class="step"><div class="step-body"><p>Manager melihat dokumen di <strong>tugas tertunggak Dashboard</strong> atau navigasi ke modul. Mereka membuka panel Approval, opsional menambahkan catatan, dan klik <strong>✓ Setujui</strong>. Status berubah ke "Menunggu Direktur".</p></div></div>
+  <div class="step"><div class="step-body"><p>Direktur mengulangi proses yang sama. Setelah persetujuan, dokumen menjadi <strong>Disetujui</strong>. Untuk Sales Order, stok dikurangi pada titik ini melalui transaksi Firestore.</p></div></div>
+</div>
+
+<h3>Penolakan</h3>
+<p>Approver mana pun dapat menolak dokumen. Mereka harus mengisi catatan penolakan. Dokumen kembali ke Draft dengan alasan penolakan ditampilkan. Pembuat dapat mengedit dan mengajukan kembali.</p>
+
+<h3>Watermark DRAFT</h3>
+<p>Dokumen apa pun yang dicetak sebelum mendapatkan persetujuan final menampilkan watermark diagonal besar "DRAFT". Ini dihapus otomatis setelah dokumen disetujui sepenuhnya.</p>
+
+<h2 id="konsep">14. Konsep Utama</h2>
+
+<h3>Blended Modal (Harga Beli Blended)</h3>
+<p>Saat kargo memiliki beberapa supply tranches dengan harga berbeda, blended modal adalah <strong>rata-rata tertimbang berdasarkan volume</strong> dari semua biaya efektif:</p>
+<p><code>Blended Modal = Σ(biaya efektif/L × volume) / Σ(volume)</code></p>
+<p>Di mana biaya efektif/L = Harga Dasar + PBBKB + BPH Migas (PPN dikecualikan).</p>
+
+<h3>Cost of Money (CoM)</h3>
+<p>CoM mewakili biaya pembiayaan untuk menahan inventaris. Menggunakan <strong>bunga majemuk</strong>:</p>
+<p><code>CoM = Modal × ((1 + bank_rate)^(hari/365) − 1)</code></p>
+<ul>
+  <li><strong>Hari</strong> = dari rata-rata tertimbang tanggal loading hingga tanggal pembayaran (tanggal penawaran + TOP klien)</li>
+  <li><strong>Bank Rate</strong> = dikonfigurasi di Master Data → Korporat → Tarif (mis. 6,5% p.a.)</li>
+</ul>
+
+<h3>PPN — Pajak Pass-Through</h3>
+<p>PPN (Pajak Pertambahan Nilai) 11% <strong>tidak pernah menjadi biaya</strong> bagi GPP:</p>
+<ul>
+  <li>GPP membayar PPN ke supplier → dicatat sebagai <strong>pajak masukan</strong></li>
+  <li>GPP membebankan PPN ke klien → dicatat sebagai <strong>pajak keluaran</strong></li>
+  <li>PPN neto = keluaran − masukan → disetorkan ke otoritas pajak</li>
+  <li>Margin laba GPP tidak terpengaruh oleh PPN</li>
+</ul>
+
+<h3>PBBKB — Pajak Bahan Bakar Kendaraan Bermotor</h3>
+<p>PBBKB adalah pajak BBM provinsi, biasanya 5–7,5%:</p>
+<ul>
+  <li><strong>Sisi beli (tranche):</strong> Jika supplier membebankan PBBKB untuk provinsinya, ini ADALAH biaya nyata (ditambahkan ke Modal/L). Dapat dikecualikan jika supplier bukan Wapu.</li>
+  <li><strong>Sisi jual (invoice klien):</strong> GPP membebankan PBBKB ke klien hanya jika GPP terdaftar (✓) di provinsi pengiriman. Konfigurasi status registrasi di Master Data → Korporat → Tarif & PBBKB.</li>
+</ul>
+
+<h3>Periode Harga Pertamina Dua Mingguan</h3>
+<p>Pertamina memperbarui harga acuan (HIP BBN) dua kali sebulan:</p>
+<ul>
+  <li>Periode 1: Tanggal 1 – 14 setiap bulan</li>
+  <li>Periode 2: Tanggal 15 – akhir bulan</li>
+</ul>
+
+<h2 id="nomor">15. Referensi Nomor Dokumen</h2>
+<table>
+  <tr><th>Dokumen</th><th>Format</th><th>Contoh</th></tr>
+  <tr><td>Stok</td><td><code>STK-GPP-XXXX</code></td><td><code>STK-GPP-0001</code></td></tr>
+  <tr><td>Purchase Order</td><td><code>XX/PO-GPP/ROM/YYYY</code></td><td><code>02/PO-GPP/V/2026</code></td></tr>
+  <tr><td>Surat Jalan</td><td><code>XXX/DO-GPP/ROM/YYYY</code></td><td><code>078/DO-GPP/V/2026</code></td></tr>
+  <tr><td>BDR</td><td><code>XXX/BDR-GPP/ROM/YYYY</code></td><td><code>025/BDR-GPP/V/2026</code></td></tr>
+  <tr><td>Surat Penawaran</td><td><code>XXX/SPH/GPP/KODE/ROM/YYYY</code></td><td><code>001/SPH/GPP/PTRO/V/2026</code></td></tr>
+  <tr><td>Sales Order</td><td><code>XXX/SO-GPP/ROM/YYYY</code></td><td><code>001/SO-GPP/V/2026</code></td></tr>
+</table>
+<p><em>ROM = Angka Romawi bulan (I–XII). KODE = kode klien dari Master Data.</em></p>
+
+<h2 id="troubleshoot">16. Pemecahan Masalah</h2>
+<table>
+  <tr><th>Gejala</th><th>Penyebab</th><th>Solusi</th></tr>
+  <tr><td>Master Data tidak muncul di menu</td><td>Peran akun adalah Staff atau Manager</td><td>Minta Direktur menetapkan peran Anda di Pengaturan → Users & Roles</td></tr>
+  <tr><td>Peran saya masih tampil "Staff" setelah ditetapkan</td><td>Peran dimuat saat login — sesi lama</td><td>Refresh halaman atau logout lalu login kembali</td></tr>
+  <tr><td>Data klien/supplier hilang setelah diinput</td><td>Tombol 💾 Simpan di formulir tidak diklik sebelum berpindah halaman</td><td>Masukkan ulang dan klik 💾 Simpan sebelum berpindah</td></tr>
+  <tr><td>Data MOPS tidak termuat</td><td>Endpoint GAS belum dikonfigurasi atau script tidak di-deploy secara publik</td><td>Master Data → Pengaturan → MOPS Endpoint. Pastikan GAS di-deploy dengan akses "Anyone can access"</td></tr>
+  <tr><td>Blended modal tampak terlalu tinggi (data lama)</td><td>PPN sebelumnya dimasukkan ke biaya sisi beli</td><td>Simpan ulang tranches — sistem kini dengan benar mengecualikan PPN dari Modal/L</td></tr>
+  <tr><td>Stok tidak berubah ke Confirmed setelah link PO</td><td>Link PO ditambahkan ke tranche tapi Save Tranche tidak diklik</td><td>Klik 💾 Save Tranche untuk menyimpan link PO</td></tr>
+  <tr><td>Notifikasi tugas tidak muncul di Dashboard</td><td>Tidak ada tugas yang menunggu persetujuan Anda saat ini</td><td>Panel hanya muncul saat ada dokumen menunggu. Jika ada SO/PO/OL pending, pastikan dokumen sudah diajukan (bukan masih Draft).</td></tr>
+  <tr><td>Nomor surat penawaran menampilkan "XXX" untuk kode klien</td><td>Klien dipilih tapi tidak memiliki kode</td><td>Buka Master Data → Klien → Edit klien → tambahkan Kode Klien</td></tr>
+  <tr><td>Perlu backup darurat / restore data</td><td>—</td><td>Master Data → Pengaturan → Export Backup JSON. Simpan file dengan aman. Untuk restore: Import JSON (counter tetap dipertahankan).</td></tr>
+</table>
+
+<div class="callout info" style="margin-top:32px">
+  <span class="icon">📞</span>
+  <p>Untuk masalah teknis dengan Firebase backend, error aplikasi, atau permintaan fitur, hubungi administrator sistem: <strong>nico@kairenecosolution.com</strong></p>
+</div>
+
+<p style="margin-top:48px;padding-top:24px;border-top:1px solid var(--border);font-size:12px;color:#9ca3af;text-align:center;">
+  Panduan Pengguna GPP Portal · PT Global Petro Pasifik · Versi 1.0 · Mei 2026<br/>
+  Dibangun dengan React · Firebase · Vercel
+</p>
+</main>
+</div>
+<script>
+const links=document.querySelectorAll('nav a[href^="#"]');
+const sections=[...links].map(l=>document.querySelector(l.getAttribute('href'))).filter(Boolean);
+const observer=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){links.forEach(l=>l.classList.remove('active'));const a=[...links].find(l=>l.getAttribute('href')==='#'+e.target.id);if(a)a.classList.add('active');}});},{rootMargin:'-20% 0px -70% 0px'});
+sections.forEach(s=>observer.observe(s));
+</script>
+</body>
+</html>

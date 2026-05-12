@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>GPP Portal — User Manual</title>
+<style>
+  :root {
+    --blue:   #1d4ed8;
+    --blue-l: #dbeafe;
+    --gray:   #374151;
+    --gray-l: #f9fafb;
+    --border: #e5e7eb;
+    --amber:  #d97706;
+    --green:  #059669;
+    --red:    #dc2626;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; color: var(--gray); background: #fff; font-size: 14px; line-height: 1.6; }
+
+  /* Layout */
+  .layout { display: flex; min-height: 100vh; }
+  nav { width: 260px; min-width: 260px; background: #1e293b; color: #cbd5e1; position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 24px 0; }
+  main { flex: 1; padding: 40px 56px; max-width: 900px; }
+
+  /* Nav */
+  .nav-logo { padding: 0 20px 20px; border-bottom: 1px solid #334155; margin-bottom: 12px; }
+  .nav-logo .name { font-size: 13px; font-weight: 700; color: #f1f5f9; }
+  .nav-logo .sub  { font-size: 11px; color: #64748b; margin-top: 2px; }
+  nav a { display: block; padding: 6px 20px; font-size: 12px; color: #94a3b8; text-decoration: none; transition: color .15s; }
+  nav a:hover { color: #f1f5f9; }
+  nav a.active { color: #60a5fa; font-weight: 600; }
+  .nav-section { padding: 12px 20px 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #475569; }
+  nav a.indent { padding-left: 32px; font-size: 11px; }
+
+  /* Typography */
+  h1 { font-size: 28px; font-weight: 800; color: #1e293b; margin-bottom: 6px; }
+  h2 { font-size: 20px; font-weight: 700; color: #1e293b; margin: 40px 0 12px; padding-top: 40px; border-top: 2px solid var(--border); }
+  h2:first-of-type { border-top: none; margin-top: 20px; padding-top: 0; }
+  h3 { font-size: 15px; font-weight: 700; color: var(--blue); margin: 24px 0 8px; }
+  h4 { font-size: 13px; font-weight: 600; color: #374151; margin: 16px 0 6px; }
+  p  { margin-bottom: 10px; }
+  ul, ol { margin: 8px 0 12px 20px; }
+  li { margin-bottom: 4px; }
+  strong { color: #1e293b; }
+  code { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; padding: 1px 6px; font-family: monospace; font-size: 12px; color: #0f172a; }
+
+  /* Cover */
+  .cover { background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%); color: white; padding: 48px 56px; margin: -40px -56px 40px; }
+  .cover h1 { color: white; font-size: 36px; }
+  .cover .sub { font-size: 15px; color: #bfdbfe; margin-top: 8px; }
+  .cover .meta { margin-top: 24px; display: flex; gap: 32px; font-size: 12px; color: #93c5fd; }
+  .cover .meta strong { color: white; display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 2px; }
+
+  /* Callout boxes */
+  .callout { border-radius: 8px; padding: 14px 16px; margin: 16px 0; display: flex; gap: 12px; }
+  .callout .icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+  .callout p { margin: 0; }
+  .callout.info   { background: #eff6ff; border: 1px solid #bfdbfe; }
+  .callout.warn   { background: #fffbeb; border: 1px solid #fde68a; }
+  .callout.tip    { background: #ecfdf5; border: 1px solid #a7f3d0; }
+  .callout.danger { background: #fef2f2; border: 1px solid #fecaca; }
+
+  /* Steps */
+  .steps { counter-reset: step; margin: 12px 0; }
+  .step { display: flex; gap: 16px; margin-bottom: 14px; }
+  .step::before { counter-increment: step; content: counter(step); background: var(--blue); color: white; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .step-body { flex: 1; }
+  .step-body p { margin: 0; }
+  .step-body small { color: #6b7280; font-size: 12px; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 13px; }
+  th { background: #1e3a8a; color: white; text-align: left; padding: 10px 12px; font-weight: 600; font-size: 12px; }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:hover td { background: #f8fafc; }
+
+  /* Badges */
+  .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 99px; }
+  .badge.draft    { background: #f1f5f9; color: #64748b; }
+  .badge.pending  { background: #fef9c3; color: #854d0e; }
+  .badge.approved { background: #dcfce7; color: #166534; }
+  .badge.rejected { background: #fee2e2; color: #991b1b; }
+  .badge.blue     { background: #dbeafe; color: #1e40af; }
+
+  /* Role cards */
+  .role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+  .role-card { border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+  .role-card .role-name { font-weight: 700; font-size: 13px; margin-bottom: 6px; }
+  .role-card.admin   .role-name { color: #7c3aed; }
+  .role-card.director .role-name { color: var(--blue); }
+  .role-card.manager .role-name { color: #0d9488; }
+  .role-card.staff   .role-name { color: #6b7280; }
+
+  /* Screen mock */
+  .screen { background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin: 14px 0; font-size: 12px; }
+  .screen .toolbar { background: white; border: 1px solid var(--border); border-radius: 6px; padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .screen .btn { background: var(--blue); color: white; padding: 5px 12px; border-radius: 5px; font-size: 11px; font-weight: 600; display: inline-block; }
+  .screen .btn.outline { background: white; color: var(--blue); border: 1px solid #bfdbfe; }
+  .screen .table-row { display: flex; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--border); background: white; font-size: 12px; }
+  .screen .table-row:last-child { border-bottom: none; border-radius: 0 0 6px 6px; }
+  .screen .table-header { display: flex; gap: 12px; padding: 6px 14px; background: #f1f5f9; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; border-radius: 6px 6px 0 0; }
+  .mono { font-family: monospace; font-size: 12px; color: var(--blue); font-weight: 600; }
+
+  /* TOC page */
+  .toc { columns: 2; column-gap: 32px; margin: 16px 0; }
+  .toc-item { break-inside: avoid; display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dotted #d1d5db; font-size: 13px; margin-bottom: 2px; }
+  .toc-item .num { color: #6b7280; font-size: 12px; }
+  .toc-item.h2 { font-weight: 700; border-bottom: 1px solid #9ca3af; }
+  .toc-item.h3 { padding-left: 16px; color: #374151; font-size: 12px; }
+
+  /* Print */
+  @media print {
+    nav { display: none; }
+    main { padding: 20px; max-width: 100%; }
+    .cover { margin: -20px -20px 30px; padding: 30px; }
+    h2 { page-break-before: always; }
+    h2:first-of-type { page-break-before: avoid; }
+  }
+
+  @media (max-width: 768px) {
+    nav { display: none; }
+    main { padding: 24px 20px; }
+    .role-grid { grid-template-columns: 1fr; }
+    .toc { columns: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- Sidebar Navigation -->
+<nav>
+  <div class="nav-logo">
+    <div class="name">GPP Portal</div>
+    <div class="sub">User Manual v1.0</div>
+  </div>
+  <a href="#overview">Overview</a>
+  <a href="#getting-started">Getting Started</a>
+  <div class="nav-section">Modules</div>
+  <a href="#dashboard">Dashboard</a>
+  <a href="#stok" class="indent">Stok</a>
+  <a href="#calculator" class="indent">Calculator</a>
+  <a href="#offering-letter" class="indent">Surat Penawaran</a>
+  <a href="#sales-order" class="indent">Sales Order</a>
+  <a href="#purchase-order" class="indent">Purchase Order</a>
+  <a href="#delivery-order" class="indent">Delivery Order</a>
+  <a href="#mops" class="indent">Data MOPS</a>
+  <div class="nav-section">Administration</div>
+  <a href="#master-data">Master Data</a>
+  <a href="#corporate" class="indent">Corporate</a>
+  <a href="#clients" class="indent">Clients</a>
+  <a href="#suppliers" class="indent">Suppliers</a>
+  <a href="#settings" class="indent">Settings</a>
+  <a href="#roles">Roles & Permissions</a>
+  <a href="#approval">Approval Workflow</a>
+  <div class="nav-section">Reference</div>
+  <a href="#concepts">Key Concepts</a>
+  <a href="#doc-numbers">Document Numbers</a>
+  <a href="#troubleshooting">Troubleshooting</a>
+</nav>
+
+<!-- Main Content -->
+<main>
+
+<!-- Cover -->
+<div class="cover">
+  <h1>GPP Portal</h1>
+  <div class="sub">User Manual — PT Global Petro Pasifik</div>
+  <div class="meta">
+    <div><strong>Version</strong>1.0 — May 2026</div>
+    <div><strong>Platform</strong>Web / Mobile (PWA)</div>
+    <div><strong>Stack</strong>React · Firebase · Vercel</div>
+  </div>
+</div>
+
+<!-- Overview -->
+<h2 id="overview">1. Overview</h2>
+<p><strong>GPP Portal</strong> is the internal trading operations system for PT Global Petro Pasifik. It covers the full fuel trading cycle — from supply procurement and stock management through pricing calculation, offer letters, sales orders, purchase orders, and delivery documentation.</p>
+
+<h3>What GPP Portal Does</h3>
+<table>
+  <tr><th>Module</th><th>Purpose</th></tr>
+  <tr><td><strong>Stok</strong></td><td>Track incoming cargo positions and supply tranches from multiple suppliers</td></tr>
+  <tr><td><strong>Calculator</strong></td><td>Real-time P&L modeling — blended cost, cost of money, margin analysis</td></tr>
+  <tr><td><strong>Surat Penawaran</strong></td><td>Generate formal offer letters to clients with full tax breakdown</td></tr>
+  <tr><td><strong>Sales Order</strong></td><td>Formalize client commitments linked to offering letters and stock</td></tr>
+  <tr><td><strong>Purchase Order</strong></td><td>Issue procurement orders to suppliers with approval workflow</td></tr>
+  <tr><td><strong>Delivery Order</strong></td><td>Issue delivery documentation and bill of delivery receipts</td></tr>
+  <tr><td><strong>Data MOPS</strong></td><td>Live MOPS pricing, JISDOR, bi-monthly Pertamina reference data</td></tr>
+  <tr><td><strong>Master Data</strong></td><td>Company profiles, client database, suppliers, products, tax rates</td></tr>
+</table>
+
+<h3>Design Principles</h3>
+<ul>
+  <li><strong>PPN is pass-through</strong> — VAT is never included in profit calculations. It is collected from clients and remitted to the government; GPP claims input VAT against output VAT.</li>
+  <li><strong>Blended cost is volume-weighted</strong> — when a cargo has multiple supply tranches at different prices, the calculator blends them proportionally by volume.</li>
+  <li><strong>All approvals are role-gated</strong> — documents flow through a configurable approval chain before becoming final.</li>
+  <li><strong>No data is lost on navigation</strong> — critical data (clients, suppliers) saves immediately to Firestore when entered.</li>
+</ul>
+
+<!-- Getting Started -->
+<h2 id="getting-started">2. Getting Started</h2>
+
+<h3>Logging In</h3>
+<div class="steps">
+  <div class="step"><div class="step-body"><p>Navigate to <code>gpp-project.vercel.app</code> (or your custom domain).</p></div></div>
+  <div class="step"><div class="step-body"><p>Enter your email and password. Your account must be created in Firebase Authentication by the administrator.</p></div></div>
+  <div class="step"><div class="step-body"><p>After logging in, your role is loaded automatically from the database. You will see only the menus your role allows.</p></div></div>
+</div>
+
+<div class="callout info">
+  <span class="icon">ℹ️</span>
+  <p>First-time login: contact your administrator to create your Firebase account and assign your role in Master Data → Settings → Users & Roles. Until a role is assigned, you default to <strong>Staff</strong>.</p>
+</div>
+
+<h3>Changing Your Password</h3>
+<div class="steps">
+  <div class="step"><div class="step-body"><p>Click <strong>🔑 Ganti Password</strong> in the bottom-left sidebar.</p></div></div>
+  <div class="step"><div class="step-body"><p>Enter your current password, then your new password (minimum 6 characters), then confirm it.</p></div></div>
+  <div class="step"><div class="step-body"><p>Click <strong>Ubah Password</strong>. A ✅ confirmation appears. Your password is changed immediately.</p><small>Firebase re-authentication is required — if your current password is wrong you will see an error.</small></div></div>
+</div>
+
+<h3>Installing as a Mobile App (PWA)</h3>
+<p>GPP Portal is a Progressive Web App. On mobile:</p>
+<ul>
+  <li><strong>Android (Chrome):</strong> tap the menu (⋮) → "Add to Home Screen"</li>
+  <li><strong>iOS (Safari):</strong> tap the Share icon → "Add to Home Screen"</li>
+</ul>
+<p>Once installed, GPP Portal opens like a native app without a browser bar.</p>
+
+<!-- Dashboard -->
+<h2 id="dashboard">3. Dashboard</h2>
+<p>The Dashboard is the first screen after login. It provides an at-a-glance summary of operations and alerts you to any documents waiting for your approval.</p>
+
+<h3>Pending Approval Tasks</h3>
+<p>The amber notification panel at the top shows all documents waiting for your specific role's approval. Each item shows:</p>
+<ul>
+  <li>Document type (color-coded: purple = PO, blue = SO, amber = OL)</li>
+  <li>Document number and vendor/client name</li>
+  <li>Current status badge (e.g., "Menunggu Manager")</li>
+  <li><strong>Buka →</strong> button — navigates directly to that module</li>
+</ul>
+<div class="callout tip">
+  <span class="icon">✅</span>
+  <p>If there are no pending tasks, this panel is hidden. A clean dashboard means no action is required.</p>
+</div>
+
+<h3>Stat Cards</h3>
+<table>
+  <tr><th>Card</th><th>Shows</th></tr>
+  <tr><td>Stok Tersedia</td><td>Total available (uncommitted) volume in litres across all Confirmed stocks</td></tr>
+  <tr><td>Terikat SO</td><td>Volume committed to approved Sales Orders</td></tr>
+  <tr><td>Total PO</td><td>Number of Purchase Orders issued; red badge shows how many await your approval</td></tr>
+  <tr><td>Delivery Orders</td><td>Total Delivery Orders issued</td></tr>
+</table>
+
+<h3>Confirmed Stock Bars</h3>
+<p>Progress bars show each Confirmed stock's committed vs available volume. A fully filled bar means the cargo is fully committed to Sales Orders.</p>
+
+<!-- Stok -->
+<h2 id="stok">4. Stok (Cargo Positions)</h2>
+<p>The Stok module tracks incoming supply positions. Each position can hold multiple <strong>tranches</strong> — separate shipments from different suppliers, vessels, or purchase dates that form one combined cargo.</p>
+
+<h3>Understanding the Layout</h3>
+<ul>
+  <li><strong>Left panel:</strong> List of all cargo positions. Click any card to view its detail.</li>
+  <li><strong>Right panel:</strong> Selected position's stats, tranche table, and linked POs.</li>
+</ul>
+
+<h3>Creating a New Position</h3>
+<div class="steps">
+  <div class="step"><div class="step-body"><p>Click <strong>+ New Position</strong> in the left panel.</p></div></div>
+  <div class="step"><div class="step-body"><p>Enter a descriptive label (e.g., "Batam P1 MAY 2026"), product type, loading port, discharging port, and ETA dates.</p></div></div>
+  <div class="step"><div class="step-body"><p>Click <strong>+ Create Position</strong>. The stock is created in Draft status with no tranches yet.</p></div></div>
+</div>
+
+<h3>Adding a Tranche</h3>
+<div class="steps">
+  <div class="step"><div class="step-body"><p>With a stock selected, click <strong>+ Add Tranche</strong> in the top-right of the detail panel.</p></div></div>
+  <div class="step"><div class="step-body"><p>Fill in the tranche details:
+    <ul>
+      <li><strong>Supplier</strong> — who you're buying from</li>
+      <li><strong>Vessel / SPOB</strong> — the delivery vessel for this specific tranche</li>
+      <li><strong>Base Price (IDR/L)</strong> — purchase price before taxes</li>
+      <li><strong>Volume (L)</strong> — quantity in litres</li>
+      <li><strong>Load Date</strong> — when product is loaded/received</li>
+      <li><strong>Pay Date</strong> — when payment is made to supplier (used for CoM)</li>
+      <li><strong>Province</strong> — supplier's province (determines PBBKB rate)</li>
+    </ul>
+  </p></div></div>
+  <div class="step"><div class="step-body"><p>Select applicable taxes from the supplier:
+    <ul>
+      <li><strong>PPN</strong> — check this if the supplier charges VAT. <em>Note: PPN does NOT affect the Modal/L or profit calculation — it is pass-through.</em></li>
+      <li><strong>BPH Migas</strong> — check if supplier charges this levy (0.25%)</li>
+      <li><strong>PBBKB</strong> — check if supplier charges fuel tax for their province. Check "Omit PBBKB" if supplier is non-Wapu or non-PKP.</li>
+    </ul>
+  </p></div></div>
+  <div class="step"><div class="step-body"><p>Optionally, link a Purchase Order (see below). Click <strong>💾 Save Tranche</strong>.</p></div></div>
+</div>
+
+<div class="callout warn">
+  <span class="icon">⚠️</span>
+  <p><strong>PPN is pass-through.</strong> Even if the supplier charges PPN 11%, the system excludes it from the Modal/L and blended cost calculation. This is correct — GPP claims the input VAT back against the output VAT charged to clients.</p>
+</div>
+
+<h3>Linking a PO to a Tranche</h3>
+<p>Once a Purchase Order has been created, you can link it to the relevant tranche to validate prices and volumes:</p>
+<div class="steps">
+  <div class="step"><div class="step-body"><p>Edit an existing tranche (hover the row → click <strong>Edit</strong>).</p></div></div>
+  <div class="step"><div class="step-body"><p>In the "Link ke Purchase Order" section, select the PO from the dropdown.</p></div></div>
+  <div class="step"><div class="step-body"><p>The system compares tranche price and volume against the PO items. You will see either:
+    <ul>
+      <li>✅ <strong>Harga dan volume sesuai PO</strong> — all good</li>
+      <li>⚠️ <strong>Tidak sesuai PO</strong> — with exact differences shown. Use <strong>↓ Prefill dari PO</strong> to sync.</li>
+    </ul>
+  </p></div></div>
+  <div class="step"><div class="step-body"><p>Save the tranche. The stock automatically moves to <strong>Confirmed</strong> status when any tranche has a linked PO.</p></div></div>
+</div>
+
+<div class="callout info">
+  <span class="icon">ℹ️</span>
+  <p><strong>Workflow tip:</strong> Traders often model tranches before committing to a PO. You can create a stock with tranches for quick P&L calculation, then create the PO (which triggers the approval workflow), and link it back to the tranche once approved. The tranche fields are never locked — they remain editable even after PO linking.</p>
+</div>
+
+<h3>Stock Status</h3>
+<table>
+  <tr><th>Status</th><th>Meaning</th></tr>
+  <tr><td><span class="badge draft">Draft</span></td><td>Stock created, tranches modeled, no PO linked yet. Used for calculation/planning.</td></tr>
+  <tr><td><span class="badge blue">Confirmed</span></td><td>At least one tranche is linked to a Purchase Order. Real, committed inventory.</td></tr>
+  <tr><td><span class="badge approved">Sold Out</span></td><td>Committed SO volume equals or exceeds total stock volume. Auto-set.</td></tr>
+  <tr><td><span class="badge draft">Closed</span></td><td>Manually closed. No further transactions.</td></tr>
+</table>
+
+<h3>Reading the Tranche Table</h3>
+<table>
+  <tr><th>Column</th><th>Meaning</th></tr>
+  <tr><td>Supplier</td><td>Who you purchased from</td></tr>
+  <tr><td>Vessel</td><td>Delivery vessel/SPOB for this specific tranche</td></tr>
+  <tr><td>Base Price</td><td>Purchase price before taxes (IDR/L)</td></tr>
+  <tr><td>Volume (L)</td><td>Quantity in litres</td></tr>
+  <tr><td>Load Date</td><td>Physical loading date (used for CoM start)</td></tr>
+  <tr><td>Province</td><td>Supplier province (PBBKB jurisdiction)</td></tr>
+  <tr><td>Taxes</td><td>Active cost taxes: BPH, PBBKB (PPN shown as pass-through)</td></tr>
+  <tr><td>Modal/L</td><td>Effective cost per litre = Base + PBBKB + BPH (PPN excluded)</td></tr>
+  <tr><td>PO badge</td><td>✅ matched / ⚠️ mismatch / blank = not linked</td></tr>
+</table>
+<p>The <strong>Blended (volume-weighted)</strong> row in the table footer shows the aggregate weighted average — this is what the Calculator uses as the buy price.</p>
+
+<!-- Calculator -->
+<h2 id="calculator">5. Calculator</h2>
+<p>The Calculator is the core P&L modeling tool. It computes real-time margin analysis for a given cargo position and selling scenario.</p>
+
+<h3>Loading a Cargo Position</h3>
+<div class="steps">
+  <div class="step"><div class="step-body"><p>Click <strong>Prefill dari Stok</strong> (or navigate from the Stok module via the 🧮 Kalkulasi button) to load a cargo's tranches automatically.</p></div></div>
+  <div class="step"><div class="step-body"><p>Alternatively, manually enter tranches in the Cargo Position panel on the left.</p></div></div>
+</div>
+
+<h3>Setting the Sell Price</h3>
+<p>Two sell modes are available:</p>
+<ul>
+  <li><strong>Direct</strong> — enter the agreed sell price (IDR/L) directly.</li>
+  <li><strong>MOPS Formula</strong> — the sell price is calculated from: <code>(MOPS × JISDOR / 158.987 + Premium) × Weight% + HIP BBN × (1 - Weight%)</code>. Useful for MOPS-indexed contracts.</li>
+</ul>
+
+<h3>Understanding the P&L Output</h3>
+<table>
+  <tr><th>Line</th><th>Description</th></tr>
+  <tr><td>Blended Buy (Modal)</td><td>Volume-weighted average effective cost per litre (excl. PPN)</td></tr>
+  <tr><td>Cost of Money (CoM)</td><td>Financing cost from load date to payment date. Compound: <code>Modal × ((1 + rate)^(days/365) − 1)</code></td></tr>
+  <tr><td>Loss</td><td>Volume loss tolerance on sell price. <code>Sell × loss%</code></td></tr>
+  <tr><td>Fuel Margin</td><td>Sell − Modal − CoM − Loss</td></tr>
+  <tr><td>OAT Modal</td><td>Your freight/logistics cost per litre</td></tr>
+  <tr><td>OAT Client</td><td>Freight charged to client per litre</td></tr>
+  <tr><td>Freight Margin</td><td>OAT Client − OAT Modal</td></tr>
+  <tr><td>Total Margin</td><td>Fuel Margin + Freight Margin</td></tr>
+</table>
+
+<h3>Client Invoice Section</h3>
+<p>Below the P&L table, the calculator shows the client invoice breakdown:</p>
+<ul>
+  <li><strong>DPP (Dasar Pengenaan Pajak)</strong> — the sell price per litre, base for tax calculation</li>
+  <li><strong>PBBKB</strong> — fuel tax charged to client (if your company is registered in that province)</li>
+  <li><strong>PPN 11%</strong> — output VAT charged to client (pass-through)</li>
+  <li><strong>OAT Client</strong> — freight charge</li>
+  <li><strong>Client Pays</strong> — total per litre the client actually pays</li>
+</ul>
+
+<h3>Saving Snapshots</h3>
+<p>Click <strong>💾 Simpan Kalkulasi</strong> to save the current calculation as an immutable snapshot. Snapshots can be recalled later for reference or to continue editing — they include all cargo, pricing, and result data.</p>
+
+<!-- Offering Letter -->
+<h2 id="offering-letter">6. Surat Penawaran (Offering Letters)</h2>
+<p>The Offering Letter module generates formal price offer letters (Surat Penawaran Harga / SPH) to clients.</p>
+
+<h3>List View</h3>
+<p>The main page shows all issued letters in a table with: No. Surat | Tanggal | Client | Periode | DPP/L | Status. Hover a row to reveal action buttons: Approval | Edit | Print | Del.</p>
+
+<h3>Creating a New Letter</h3>
+<div class="steps">
+  <div class="step"><div class="step-body"><p>Click <strong>+ New Letter</strong>. A full-page form opens.</p></div></div>
+  <div class="step"><div class="step-body"><p>The <strong>Sequence No.</strong> field auto-fills with the next number. You can override it using the − / + stepper. The document number preview updates live in the header.</p></div></div>
+  <div class="step"><div class="step-body"><p>Select a <strong>Client</strong> from the dropdown. Client details (name, code, address) are pulled from Master Data automatically.</p></div></div>
+  <div class="step"><div class="step-body"><p>The <strong>Period</strong> auto-fills with the current bi-monthly Pertamina pricing period (e.g., "1 - 14 Mei 2026"). Edit it if needed.</p></div></div>
+  <div class="step"><div class="step-body"><p>Select <strong>Province (PBBKB)</strong> — this is the client's delivery province, which determines whether PBBKB applies on the sell side.</p></div></div>
+  <div class="step"><div class="step-body"><p>Set <strong>Terms of Payment</strong>: Credit (with TOP days) · CBD · COD · Lainnya (free text).</p></div></div>
+  <div class="step"><div class="step-body"><p>In the <strong>Price</strong> column, enter the DPP/L and select applicable taxes:
+    <ul>
+      <li><strong>PPN</strong> — output VAT (11%). Charged to client, pass-through to tax authority.</li>
+      <li><strong>PPH</strong> — income tax (0.3%). Becomes a cost to the buyer.</li>
+      <li><strong>PBBKB</strong> — fuel tax. Check this, and the rate for the selected province appears. Only applies if GPP is registered (✓) in that province.</li>
+    </ul>
+  </p></div></div>
+  <div class="step"><div class="step-body"><p>Add <strong>Transport Sites (OAT)</strong> if applicable — each site has a name and IDR/L rate charged to the client.</p></div></div>
+  <div class="step"><div class="step-body"><p>Click <strong>📄 Buat Surat</strong> to save. The letter is saved in Draft status.</p></div></div>
+</div>
+
+<h3>Document Number Format</h3>
+<p><code>001/SPH/GPP/PTRO/V/2026</code></p>
+<ul>
+  <li><code>001</code> — 3-digit sequence (editable)</li>
+  <li><code>SPH</code> — fixed identifier</li>
+  <li><code>GPP</code> — entity</li>
+  <li><code>PTRO</code> — client code (set in Master Data → Client)</li>
+  <li><code>V</code> — month in Roman numerals</li>
+  <li><code>2026</code> — year</li>
+</ul>
+
+<h3>Computer Generated Option</h3>
+<p>Enable <strong>"Computer Generated — No Signature Required"</strong> in the Opsi Dokumen card. When printing, the signature block is replaced with a statement that the document was generated electronically and is valid without a wet signature.</p>
+
+<h3>Printing</h3>
+<p>Hover a row in the list and click 🖨️. A print-ready preview opens with the official letter format, GPP letterhead, price table, OAT table, and payment terms. Documents in Draft or pending status show a "DRAFT" diagonal watermark.</p>
+
+<!-- Sales Order -->
+<h2 id="sales-order">7. Sales Order</h2>
+<p>A Sales Order (SO) formalizes a client's commitment to purchase. It links to an Offering Letter (optional) and reserves stock volume.</p>
+
+<h3>Creating a Sales Order</h3>
+<div class="steps">
+  <div class="step"><div class="step-body"><p>Click <strong>+ SO Baru</strong>.</p></div></div>
+  <div class="step"><div class="step-body"><p>Optionally select a <strong>Surat Penawaran</strong> from the dropdown. This auto-fills: client name, product, agreed price (DPP), delivery province, and payment terms from the OL.</p></div></div>
+  <div class="step"><div class="step-body"><p>Select a <strong>Stok</strong> — only Confirmed stocks appear, with available volume shown.</p></div></div>
+  <div class="step"><div class="step-body"><p>Enter the volume, agreed price, delivery location, and payment terms.</p></div></div>
+  <div class="step"><div class="step-body"><p>Click <strong>+ Buat SO</strong>.</p></div></div>
+</div>
+
+<h3>SO and Stock Volume</h3>
+<p>When a Sales Order receives <strong>final approval</strong> (last approver in the chain signs off), the system runs a <strong>Firestore transaction</strong> that:</p>
+<ol>
+  <li>Sets the SO status to <code>approved</code></li>
+  <li>Adds the SO volume to the stock's <code>committedVolume</code></li>
+  <li>If committed ≥ total volume, marks the stock as <strong>Sold Out</strong></li>
+</ol>
+<div class="callout warn">
+  <span class="icon">⚠️</span>
+  <p>The system warns if an SO volume exceeds available stock — but it does not block you from submitting. The approver should verify availability before approving.</p>
+</div>
+
+<h3>Linking SO to an OL</h3>
+<p>The OL reference appears in the SO card (<code>📄 001/SPH/GPP/...</code>) and in the Dashboard recent SO list. This creates a traceable chain: <strong>OL → SO → Stock deduction</strong>.</p>
+
+<!-- Purchase Order -->
+<h2 id="purchase-order">8. Purchase Order</h2>
+<p>Purchase Orders are issued to suppliers for fuel procurement. Every PO goes through the approval chain before it is considered binding.</p>
+
+<h3>Creating a PO</h3>
+<div class="steps">
+  <div class="step"><div class="step-body"><p>Click <strong>+ New Entry</strong>.</p></div></div>
+  <div class="step"><div class="step-body"><p>Select a supplier from the dropdown (auto-fills name, address, NPWP from Master Data), or enter manually.</p></div></div>
+  <div class="step"><div class="step-body"><p>Add line items: description, quantity, unit, unit price, discount. Multiple items are supported.</p></div></div>
+  <div class="step"><div class="step-body"><p>In <strong>Pajak & Pungutan</strong>, select applicable taxes: PPH, BPH Migas, PBBKB (with province).</p></div></div>
+  <div class="step"><div class="step-body"><p>The <strong>Ringkasan</strong> sidebar updates live with subtotals and total.</p></div></div>
+  <div class="step"><div class="step-body"><p>Click <strong>+ Buat PO</strong>. The PO is saved in Draft — it must be submitted for approval before it is considered binding.</p></div></div>
+</div>
+
+<h3>PO Approval</h3>
+<p>Hover a PO row in the list → click <strong>Approval</strong>. This opens the approval panel where you can submit, approve, or reject the document based on your role.</p>
+
+<h3>Linking PO to Tranche</h3>
+<p>After a PO is approved, edit the corresponding tranche in the Stok module and link the PO. The system then shows a ✅/⚠️ match indicator comparing PO price and volume against the tranche's recorded values.</p>
+
+<!-- Delivery Order -->
+<h2 id="delivery-order">9. Delivery Order</h2>
+<p>The Delivery Order module tracks product deliveries and generates:</p>
+<ul>
+  <li><strong>Surat Jalan</strong> (Delivery Note) — accompanies the physical delivery</li>
+  <li><strong>BDR</strong> (Berita Acara Delivery Receipt) — confirmation of receipt</li>
+</ul>
+<p>Document numbers follow the format: <code>001/DO-GPP/V/2026</code> and <code>001/BDR-GPP/V/2026</code>.</p>
+
+<!-- MOPS -->
+<h2 id="mops">10. Data MOPS</h2>
+<p>The MOPS Data module displays live pricing reference data fetched from a connected Google Apps Script (GAS) Web App attached to the company's DATA MOPS Google Sheet.</p>
+
+<h3>Data Available</h3>
+<table>
+  <tr><th>Field</th><th>Source</th></tr>
+  <tr><td>JISDOR</td><td>USD/IDR exchange rate</td></tr>
+  <tr><td>MOPS 10ppm (USD/bbl + IDR/L)</td><td>MOPS gasoil platts benchmark</td></tr>
+  <tr><td>MOPS 0.25%S (USD/bbl + IDR/L)</td><td>MOPS sulphur benchmark</td></tr>
+  <tr><td>WTI</td><td>West Texas Intermediate crude</td></tr>
+  <tr><td>CPO KPBN</td><td>Palm oil reference (InfoSAWIT)</td></tr>
+  <tr><td>Pertamina HIP</td><td>Bi-monthly published price (summary tab)</td></tr>
+</table>
+
+<h3>Configuring the Endpoint</h3>
+<p>Go to <strong>Master Data → Settings → MOPS Endpoint</strong>. Paste the Google Apps Script Web App URL. This URL is stored in Firebase and used by all users. The GAS script must have "Anyone" access enabled for deployment.</p>
+
+<!-- Master Data -->
+<h2 id="master-data">11. Master Data</h2>
+<p>Master Data is the configuration hub for the system. It is only accessible to Directors and Super Admins.</p>
+
+<h3 id="corporate">Corporate</h3>
+<p>Configure GPP's own company profile:</p>
+<ul>
+  <li><strong>General Info</strong> — company name, head office address, NPWP, signatories</li>
+  <li><strong>Branches</strong> — add unlimited branch offices, each with their own NPWP</li>
+  <li><strong>Bank Info</strong> — multiple bank accounts; mark one as primary (★)</li>
+  <li><strong>Rates & PBBKB</strong> — set global tax rates (PPN %, PPH %, BPH Migas %, Bank Rate for CoM); configure province-by-province PBBKB rates and toggle GPP's registration status per province</li>
+</ul>
+<div class="callout warn">
+  <span class="icon">⚠️</span>
+  <p>Click <strong>💾 Simpan</strong> at the top of the Corporate section to save changes. Corporate data uses a "save all" approach — changes accumulate until you save.</p>
+</div>
+
+<h3 id="clients">Client Database</h3>
+<p>Clients appear as dropdowns in Surat Penawaran and Sales Order.</p>
+
+<div class="steps">
+  <div class="step"><div class="step-body"><p>Click <strong>+ New Entry</strong> to open the client form.</p></div></div>
+  <div class="step"><div class="step-body"><p>Fill in: Company Name, Client Code (e.g., PTRO — used in the OL document number), NPWP, Address (multi-line, use +/− to control rows — each line appears separately in the offer letter), Contact/PIC, Email, TOP Default (days).</p></div></div>
+  <div class="step"><div class="step-body"><p>Click <strong>💾 Simpan</strong>. The entry is saved immediately to Firestore — navigating away will not lose it.</p></div></div>
+</div>
+
+<div class="callout info">
+  <span class="icon">ℹ️</span>
+  <p><strong>Client Code</strong> is critical. It becomes part of the offering letter document number (e.g., <code>001/SPH/GPP/<strong>PTRO</strong>/V/2026</code>). Use a short, consistent code for each client.</p>
+</div>
+
+<h3 id="suppliers">Supplier Database</h3>
+<p>Suppliers appear in the Purchase Order form. The same card-based pattern applies: click + New Entry, fill the form (name, NPWP, address, PIC, email, phone), and click 💾 Simpan. Data saves immediately.</p>
+
+<h3 id="settings">Settings</h3>
+<p>The Settings tab (Director/Super Admin only) contains three sub-sections:</p>
+
+<h4>Users & Roles</h4>
+<p>Add a user's email address and assign their role. Roles take effect immediately on next login (or page refresh). To add a new user account, go to <strong>Firebase Console → Authentication → Add user</strong> first, then assign the role here.</p>
+
+<h4>Approval Chain Configuration</h4>
+<p>For each document type (PO, SO, Surat Penawaran), select which roles must approve it:</p>
+<ul>
+  <li>☑ Manager + ☑ Director → two-level approval (default)</li>
+  <li>☐ Manager + ☑ Director → director-only (single level)</li>
+</ul>
+<p>Changes take effect immediately for new documents. Documents already in the approval chain continue with their original chain.</p>
+
+<h4>MOPS Endpoint & Backup</h4>
+<ul>
+  <li>Configure the GAS Web App URL for MOPS data</li>
+  <li>Export a full JSON backup of all data</li>
+  <li>Import / restore from a backup (counters are never reset by import)</li>
+</ul>
+
+<!-- Roles -->
+<h2 id="roles">12. User Roles & Permissions</h2>
+<div class="role-grid">
+  <div class="role-card admin">
+    <div class="role-name">🟣 Super Admin</div>
+    <ul>
+      <li>All permissions</li>
+      <li>Access to all modules including Master Data</li>
+      <li>Can approve documents at any level</li>
+      <li>Can delete any document</li>
+    </ul>
+  </div>
+  <div class="role-card director">
+    <div class="role-name">🔵 Director (Direktur)</div>
+    <ul>
+      <li>All permissions</li>
+      <li>Full access including Master Data</li>
+      <li>Final approver in the chain</li>
+      <li>Can delete documents</li>
+    </ul>
+  </div>
+  <div class="role-card manager">
+    <div class="role-name">🟢 Manager</div>
+    <ul>
+      <li>Access to all operational modules</li>
+      <li>No access to Master Data</li>
+      <li>First-level approver in chain</li>
+      <li>Can delete documents</li>
+    </ul>
+  </div>
+  <div class="role-card staff">
+    <div class="role-name">⚫ Staff</div>
+    <ul>
+      <li>Access to operational modules</li>
+      <li>No access to Master Data</li>
+      <li>Can create and submit documents</li>
+      <li>Cannot approve or delete</li>
+    </ul>
+  </div>
+</div>
+
+<table>
+  <tr><th>Action</th><th>Staff</th><th>Manager</th><th>Director</th><th>Super Admin</th></tr>
+  <tr><td>View all modules</td><td>✅ (no Master Data)</td><td>✅ (no Master Data)</td><td>✅</td><td>✅</td></tr>
+  <tr><td>Create & edit documents</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td></tr>
+  <tr><td>Submit for approval</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td></tr>
+  <tr><td>First-level approve (Manager)</td><td>❌</td><td>✅</td><td>✅</td><td>✅</td></tr>
+  <tr><td>Final approve (Director)</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td></tr>
+  <tr><td>Delete documents</td><td>❌</td><td>✅</td><td>✅</td><td>✅</td></tr>
+  <tr><td>Master Data access</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td></tr>
+  <tr><td>User role management</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td></tr>
+</table>
+
+<!-- Approval -->
+<h2 id="approval">13. Approval Workflow</h2>
+<p>GPP Portal uses a configurable multi-level approval system for Purchase Orders, Sales Orders, and Offering Letters.</p>
+
+<h3>Approval States</h3>
+<table>
+  <tr><th>Status</th><th>Meaning</th><th>Who Can Act</th></tr>
+  <tr><td><span class="badge draft">Draft</span></td><td>Created, not submitted</td><td>Creator can edit and submit</td></tr>
+  <tr><td><span class="badge pending">Menunggu Manager</span></td><td>Submitted, awaiting manager</td><td>Manager (or Director)</td></tr>
+  <tr><td><span class="badge pending">Menunggu Direktur</span></td><td>Manager approved, awaiting director</td><td>Director (or Super Admin)</td></tr>
+  <tr><td><span class="badge approved">Disetujui</span></td><td>Fully approved</td><td>Immutable (cannot be edited)</td></tr>
+  <tr><td><span class="badge rejected">Ditolak</span></td><td>Rejected at any level</td><td>Returns to Draft for correction</td></tr>
+</table>
+
+<h3>The Approval Flow</h3>
+<div class="steps">
+  <div class="step"><div class="step-body"><p><strong>Staff/any role creates</strong> a document in Draft status.</p></div></div>
+  <div class="step"><div class="step-body"><p>They open the document's <strong>Approval</strong> panel and click <strong>📤 Ajukan untuk Persetujuan</strong>. Status moves to "Menunggu Manager".</p></div></div>
+  <div class="step"><div class="step-body"><p>The Manager sees the document in the <strong>Dashboard pending tasks</strong> or navigates to the module. They open the Approval panel, optionally add a note, and click <strong>✓ Setujui</strong>. Status moves to "Menunggu Direktur".</p></div></div>
+  <div class="step"><div class="step-body"><p>The Director repeats the same process. On approval, the document becomes <strong>Disetujui</strong>. For Sales Orders, stock is deducted at this point via a Firestore transaction.</p></div></div>
+</div>
+
+<h3>Rejection</h3>
+<p>Either approver can reject a document. They must enter a rejection note. The document returns to Draft with the rejection reason displayed. The creator can edit and resubmit.</p>
+
+<h3>DRAFT Watermark</h3>
+<p>Any document printed before receiving final approval shows a large diagonal "DRAFT" watermark. This is removed automatically once the document is fully approved.</p>
+
+<!-- Key Concepts -->
+<h2 id="concepts">14. Key Concepts</h2>
+
+<h3>Blended Modal (Blended Buy Price)</h3>
+<p>When a cargo has multiple supply tranches at different prices, the blended modal is the <strong>volume-weighted average</strong> of all effective costs:</p>
+<p><code>Blended Modal = Σ(effective cost/L × volume) / Σ(volume)</code></p>
+<p>Where effective cost/L = Base Price + PBBKB + BPH Migas (PPN excluded).</p>
+
+<h3>Cost of Money (CoM)</h3>
+<p>CoM represents the financing cost of holding inventory. It uses <strong>compound interest</strong>:</p>
+<p><code>CoM = Modal × ((1 + bank_rate)^(days/365) − 1)</code></p>
+<ul>
+  <li><strong>Days</strong> = from weighted average load date to payment date (offering date + client TOP)</li>
+  <li><strong>Bank Rate</strong> = configured in Master Data → Corporate → Rates (e.g., 6.5% p.a.)</li>
+</ul>
+
+<h3>PPN — Pass-Through Tax</h3>
+<p>PPN (Pajak Pertambahan Nilai / VAT) at 11% is <strong>never a cost</strong> to GPP:</p>
+<ul>
+  <li>GPP pays PPN to suppliers → recorded as <strong>input tax</strong></li>
+  <li>GPP charges PPN to clients → recorded as <strong>output tax</strong></li>
+  <li>Net VAT = output − input → remitted to the tax authority</li>
+  <li>GPP's profit margin is unaffected by PPN</li>
+</ul>
+<p>In the system, the PPN checkbox on tranches is for documentation only. It does not affect Modal/L or the blended buy price.</p>
+
+<h3>PBBKB — Pajak Bahan Bakar Kendaraan Bermotor</h3>
+<p>PBBKB is a provincial fuel tax, typically 5–7.5%. It applies differently on buy and sell sides:</p>
+<ul>
+  <li><strong>Buy side (tranche):</strong> If the supplier charges PBBKB for their province, it IS a real cost (added to Modal/L). Can be omitted if supplier is non-Wapu.</li>
+  <li><strong>Sell side (client invoice):</strong> GPP charges PBBKB to the client only if GPP is registered (✓) in the delivery province. Configure registration status in Master Data → Corporate → Rates & PBBKB.</li>
+</ul>
+
+<h3>Bi-Monthly Pertamina Pricing Period</h3>
+<p>Pertamina updates its published prices (HIP BBN) twice a month:</p>
+<ul>
+  <li>Period 1: 1st – 14th of each month</li>
+  <li>Period 2: 15th – last day of each month</li>
+</ul>
+<p>The system auto-fills the current period in Surat Penawaran, but it is always editable.</p>
+
+<!-- Document Numbers -->
+<h2 id="doc-numbers">15. Document Number Reference</h2>
+<table>
+  <tr><th>Document</th><th>Format</th><th>Example</th></tr>
+  <tr><td>Stok</td><td><code>STK-GPP-XXXX</code></td><td><code>STK-GPP-0001</code></td></tr>
+  <tr><td>Purchase Order</td><td><code>XX/PO-GPP/ROM/YYYY</code></td><td><code>02/PO-GPP/V/2026</code></td></tr>
+  <tr><td>Delivery Note</td><td><code>XXX/DO-GPP/ROM/YYYY</code></td><td><code>078/DO-GPP/V/2026</code></td></tr>
+  <tr><td>BDR</td><td><code>XXX/BDR-GPP/ROM/YYYY</code></td><td><code>025/BDR-GPP/V/2026</code></td></tr>
+  <tr><td>Surat Penawaran</td><td><code>XXX/SPH/GPP/CODE/ROM/YYYY</code></td><td><code>001/SPH/GPP/PTRO/V/2026</code></td></tr>
+  <tr><td>Sales Order</td><td><code>XXX/SO-GPP/ROM/YYYY</code></td><td><code>001/SO-GPP/V/2026</code></td></tr>
+</table>
+<p><em>ROM = Roman numeral month (I–XII). CODE = client code from Master Data.</em></p>
+
+<!-- Troubleshooting -->
+<h2 id="troubleshooting">16. Troubleshooting</h2>
+
+<table>
+  <tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr>
+  <tr>
+    <td>I don't see Master Data in the menu</td>
+    <td>Your account role is Staff or Manager</td>
+    <td>Ask a Director to assign your role in Settings → Users & Roles</td>
+  </tr>
+  <tr>
+    <td>My role shows as "Staff" even after assignment</td>
+    <td>Role is loaded at login — stale session</td>
+    <td>Refresh the page or log out and back in</td>
+  </tr>
+  <tr>
+    <td>Client data disappeared after entering it</td>
+    <td>Previously: the global Save button was missed. Now: each entry saves immediately on 💾 Simpan in the form.</td>
+    <td>Re-enter and click 💾 Simpan before navigating away</td>
+  </tr>
+  <tr>
+    <td>MOPS data not loading</td>
+    <td>GAS endpoint not configured or the script is not deployed publicly</td>
+    <td>Master Data → Settings → MOPS Endpoint. Ensure the GAS script is deployed as "Anyone can access"</td>
+  </tr>
+  <tr>
+    <td>Blended modal seems too high</td>
+    <td>PPN was previously included in buy-side cost (old data)</td>
+    <td>Re-save tranches — the system now correctly excludes PPN from Modal/L</td>
+  </tr>
+  <tr>
+    <td>Stock doesn't move to Confirmed after linking PO</td>
+    <td>PO link was added to a new tranche but Save Tranche wasn't clicked</td>
+    <td>Click 💾 Save Tranche to persist the PO link</td>
+  </tr>
+  <tr>
+    <td>SO approval says "over available volume"</td>
+    <td>Committed SOs exceed total stock</td>
+    <td>The warning is advisory, not blocking. Approver should verify before approving.</td>
+  </tr>
+  <tr>
+    <td>Offering letter doc number shows "XXX" for client code</td>
+    <td>Client was selected but has no code set</td>
+    <td>Go to Master Data → Client → Edit the client → add a Kode Client</td>
+  </tr>
+  <tr>
+    <td>I need to reset the approval chain for a document</td>
+    <td>Only Draft/Rejected documents are editable</td>
+    <td>A Director can reject the document — it returns to Draft for resubmission</td>
+  </tr>
+  <tr>
+    <td>Data backup / emergency restore</td>
+    <td>—</td>
+    <td>Master Data → Settings → Export Backup JSON. Store the file securely. To restore: Import JSON (counters are preserved).</td>
+  </tr>
+</table>
+
+<div class="callout info" style="margin-top:32px">
+  <span class="icon">📞</span>
+  <p>For technical issues with the Firebase backend, application errors, or feature requests, contact the system administrator: <strong>nico@kairenecosolution.com</strong></p>
+</div>
+
+<p style="margin-top:48px;padding-top:24px;border-top:1px solid var(--border);font-size:12px;color:#9ca3af;text-align:center;">
+  GPP Portal User Manual · PT Global Petro Pasifik · Version 1.0 · May 2026<br/>
+  Built with React · Firebase · Vercel
+</p>
+
+</main>
+</div>
+
+<script>
+// Highlight active nav link on scroll
+const links = document.querySelectorAll('nav a[href^="#"]');
+const sections = [...links].map(l => document.querySelector(l.getAttribute('href'))).filter(Boolean);
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      links.forEach(l => l.classList.remove('active'));
+      const active = [...links].find(l => l.getAttribute('href') === '#' + e.target.id);
+      if (active) active.classList.add('active');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
