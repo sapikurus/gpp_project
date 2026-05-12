@@ -1,0 +1,68 @@
+// ─── Default chains — change here or override in Firestore settings ──────────
+export const DEFAULT_CHAINS = {
+  po: ['manager', 'director'],
+  so: ['manager', 'director'],
+  ol: ['manager', 'director'],
+};
+
+export const getChain = (settings, docType) =>
+  settings?.approvalChain?.[docType] || DEFAULT_CHAINS[docType];
+
+// First pending status when submitted
+export const firstPending = (chain) => `pending_${chain[0]}`;
+
+// Next status after a role approves
+export const nextStatus = (chain, currentStatus) => {
+  const pending = chain.map(r => `pending_${r}`);
+  const idx = pending.indexOf(currentStatus);
+  if (idx < 0) return 'draft';
+  return idx < pending.length - 1 ? pending[idx + 1] : 'approved';
+};
+
+// Can this role take approval action on this doc?
+export const canApprove = (role, status, chain) =>
+  !!role && status === `pending_${role}` && chain.includes(role);
+
+// Can this role submit (any non-approver, or approver when doc is draft)
+export const canSubmit = (status) =>
+  !status || status === 'draft' || status === 'rejected';
+
+// Is the document editable (only when draft or rejected)
+export const isEditable = (status) =>
+  !status || status === 'draft' || status === 'rejected';
+
+// Is doc fully approved
+export const isApproved = (status) => status === 'approved';
+
+// Status display config
+export const statusMeta = (status) => ({
+  draft:            { label: 'Draft',             badge: 'bg-gray-100 text-gray-600',     dot: 'bg-gray-400' },
+  rejected:         { label: 'Ditolak',           badge: 'bg-red-100 text-red-700',       dot: 'bg-red-500' },
+  pending_manager:  { label: 'Menunggu Manager',  badge: 'bg-yellow-100 text-yellow-700', dot: 'bg-yellow-400' },
+  pending_director: { label: 'Menunggu Direktur', badge: 'bg-orange-100 text-orange-700', dot: 'bg-orange-400' },
+  approved:         { label: 'Disetujui',         badge: 'bg-green-100 text-green-700',   dot: 'bg-green-500' },
+})[status] || { label: status, badge: 'bg-gray-100 text-gray-500', dot: 'bg-gray-400' };
+
+// Roles that can approve anything (bypass chain)
+export const isSuperRole = (role) => role === 'director' || role === 'superadmin';
+
+// Can this role see master data
+export const canSeeMasterData = (role) =>
+  role === 'director' || role === 'superadmin';
+
+// Can this role delete documents
+export const canDelete = (role) =>
+  role === 'director' || role === 'superadmin' || role === 'manager';
+
+// Menu access per role
+export const ROLE_MENU = {
+  superadmin: ['/', '/stok', '/calculator', '/offering-letter', '/sales-order', '/purchase-order', '/delivery-order', '/mops', '/master-data'],
+  director:   ['/', '/stok', '/calculator', '/offering-letter', '/sales-order', '/purchase-order', '/delivery-order', '/mops', '/master-data'],
+  manager:    ['/', '/stok', '/calculator', '/offering-letter', '/sales-order', '/purchase-order', '/delivery-order', '/mops'],
+  staff:      ['/', '/stok', '/calculator', '/offering-letter', '/sales-order', '/purchase-order', '/delivery-order', '/mops'],
+};
+
+export const canAccessRoute = (role, path) => {
+  const allowed = ROLE_MENU[role] || ROLE_MENU.staff;
+  return allowed.some(r => path === r || (r !== '/' && path.startsWith(r)));
+};

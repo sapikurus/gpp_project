@@ -40,11 +40,14 @@ export const POS_REF    = () => collection(db, 'gpp', 'data', 'purchaseOrders');
 export const DOS_REF    = () => collection(db, 'gpp', 'data', 'deliveryOrders');
 export const CALCS_REF  = () => collection(db, 'gpp', 'data', 'calculations');
 export const OLS_REF    = () => collection(db, 'gpp', 'data', 'offeringLetters');
-export const CARGOS_REF = () => collection(db, 'gpp', 'data', 'cargos');
+export const STOCKS_REF = () => collection(db, 'gpp', 'data', 'stocks');
+export const SOS_REF    = () => collection(db, 'gpp', 'data', 'salesOrders');
+// Legacy alias — keep for any existing data
+export const CARGOS_REF = STOCKS_REF;
 
 // ─── Default structure (used ONLY when document does not exist at all) ────────
 export const INIT_DATA = {
-  counters: { po: 0, do: 0, bdr: 0, ol: 0, cargo: 0, calc: 0 },
+  counters: { po: 0, do: 0, bdr: 0, ol: 0, stock: 0, so: 0, calc: 0 },
   company: {
     name: 'PT Global Petro Pasifik',
     address1: 'Jl. Central Raya No.17 - Batam',
@@ -133,22 +136,85 @@ export async function deleteSubDoc(colRef, id) {
 
 // ─── Full backup export ───────────────────────────────────────────────────────
 export async function exportBackup() {
-  const [data, pos, dos, ols, calcs, cargos] = await Promise.all([
+  const [data, pos, dos, ols, calcs, stocks, sos] = await Promise.all([
     fetchData(),
     fetchCollection(POS_REF()),
     fetchCollection(DOS_REF()),
     fetchCollection(OLS_REF()),
     fetchCollection(CALCS_REF()),
-    fetchCollection(CARGOS_REF()),
+    fetchCollection(STOCKS_REF()),
+    fetchCollection(SOS_REF()),
   ]);
-  return { exportedAt: new Date().toISOString(), data, pos, dos, ols, calcs, cargos };
+  return { exportedAt: new Date().toISOString(), data, pos, dos, ols, calcs, stocks, sos };
 }
 
 // ─── Restore from backup (only restores data fields, never counters) ──────────
 export async function importBackup(json) {
   const { data } = json;
   if (!data) throw new Error('Invalid backup: missing data field');
-  // Restore only safe fields — never touch counters
   const { counters: _skip, ...safeFields } = data;
   await updateDoc(DATA_REF(), safeFields);
 }
+
+// ─── Role helpers ─────────────────────────────────────────────────────────────
+// Get role for a user email from userRoles map
+export async function getUserRole(email) {
+  const snap = await getDoc(DATA_REF());
+  const userRoles = snap.data()?.userRoles || {};
+  return userRoles[email] || 'staff';
+}
+
+// ─── Approval helpers ─────────────────────────────────────────────────────────
+// Apply an approval action to a document
+// action: 'submit' | 'approve' | 'reject'
+// nextStatus: computed by approvalUtils caller
+export async function applyApproval(colRef, docId, { action, nextApprovalStatus, role, email, note }) {
+  const historyEntry = { role, action, by: email, at: Date.now(), note: note || '' };
+  await updateDoc(doc(colRef, docId), {
+    approvalStatus: nextApprovalStatus,
+    [`approvalHistory`]: (await getDoc(doc(colRef, docId))).data()?.approvalHistory
+      ? [...(await getDoc(doc(colRef, docId))).data().approvalHistory, historyEntry]
+      : [historyEntry],
+    updatedAt: Date.now(),
+  });
+}
+
+// Surgical approval update — avoids double-read
+export async function applyApprovalDirect(colRef, docId, currentHistory, { action, nextApprovalStatus, role, email, note }) {
+  const historyEntry = { role, action, by: email, at: Date.now(), note: note || '' };
+  await updateDoc(doc(colRef, docId), {
+    approvalStatus: nextApprovalStatus,
+    approvalHistory: [...(currentHistory || []), historyEntry],
+    updatedAt: Date.now(),
+  });
+}
+
+// SO approval with Stok deduction — runs as a transaction
+// Only called when the final approver (last in chain) approves an SO
+export async function approveSoFinal({ soId, soData, historyEntry }) {
+  await runTransaction(db, async (tx) => {
+    const soRef    = doc(SOS_REF(), soId);
+    const stockRef = doc(STOCKS_REF(), soData.stockId);
+    const stockSnap = await tx.get(stockRef);
+
+    const newHistory = [...(soData.approvalHistory || []), historyEntry];
+    tx.update(soRef, {
+      approvalStatus: 'approved',
+      approvalHistory: newHistory,
+      updatedAt: Date.now(),
+    });
+
+    if (stockSnap.exists() && soData.stockId) {
+      const existing  = stockSnap.data();
+      const newCommitted = (existing.committedVolume || 0) + (parseFloat(soData.volume) || 0);
+      const totalVol  = existing.totalVolume || 0;
+      const newStatus = newCommitted >= totalVol ? 'Sold Out' : 'Confirmed';
+      tx.update(stockRef, {
+        committedVolume: newCommitted,
+        status: newStatus,
+        updatedAt: Date.now(),
+      });
+    }
+  });
+}
+

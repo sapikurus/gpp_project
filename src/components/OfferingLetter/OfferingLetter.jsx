@@ -5,6 +5,12 @@ import { formatIDR, formatDateID, buildOLNumber, today, terbilang } from '../../
 import PrintWrapper from '../Layout/PrintWrapper.jsx';
 import logo from '../../assets/gpp-logo.png';
 
+// 2-decimal IDR formatter for offering letters
+const formatIDR2 = (n) => new Intl.NumberFormat('id-ID', {
+  style: 'currency', currency: 'IDR',
+  minimumFractionDigits: 2, maximumFractionDigits: 2,
+}).format(Number(n) || 0);
+
 const INIT = { olDate:today(), validDays:14, attentionTo:'', customerName:'', customerAddr:'', subject:'', items:[{description:'',qty:'',unit:'Liter',unitPrice:''}], terms:'Net 14 hari setelah pengiriman', paymentTo:'', notes:'' };
 
 export default function OfferingLetter() {
@@ -75,7 +81,7 @@ export default function OfferingLetter() {
                     {[['qty','Qty'],['unit','Satuan'],['unitPrice','Harga Satuan (IDR)']].map(([k,l])=>(
                       <div key={k}><label className="block text-xs text-gray-400 mb-1">{l}</label><input type={k==='unit'?'text':'number'} value={item[k]} onChange={e=>setItem(i,k,e.target.value)} className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm focus:outline-none"/></div>
                     ))}
-                    <div><label className="block text-xs text-gray-400 mb-1">Subtotal</label><p className="px-2 py-1.5 text-sm font-mono text-blue-700">{formatIDR((parseFloat(item.qty)||0)*(parseFloat(item.unitPrice)||0))}</p></div>
+                    <div><label className="block text-xs text-gray-400 mb-1">Subtotal</label><p className="px-2 py-1.5 text-sm font-mono text-blue-700">{formatIDR2((parseFloat(item.qty)||0)*(parseFloat(item.unitPrice)||0))}</p></div>
                   </div>
                   {form.items.length>1&&<button onClick={()=>removeItem(i)} className="absolute top-2 right-2 text-red-400 text-xs">✕</button>}
                 </div>
@@ -97,9 +103,9 @@ export default function OfferingLetter() {
           <div className="bg-white rounded-xl shadow-sm p-5 sticky top-4">
             <h2 className="font-semibold text-gray-700 mb-3">Ringkasan</h2>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span className="font-mono">{formatIDR(subtotal)}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">PPN {appData?.rates?.ppn||11}%</span><span className="font-mono">{formatIDR(taxAmt)}</span></div>
-              <div className="flex justify-between font-bold text-base border-t pt-2"><span>Total</span><span className="font-mono text-blue-700">{formatIDR(grandTotal)}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span className="font-mono">{formatIDR2(subtotal)}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">PPN {appData?.rates?.ppn||11}%</span><span className="font-mono">{formatIDR2(taxAmt)}</span></div>
+              <div className="flex justify-between font-bold text-base border-t pt-2"><span>Total</span><span className="font-mono text-blue-700">{formatIDR2(grandTotal)}</span></div>
             </div>
             <button onClick={saveAndPrint} disabled={saving} className="w-full mt-4 bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-50">{saving?'⏳':'🖨️ Simpan & Cetak'}</button>
           </div>
@@ -148,14 +154,14 @@ function OLPrint({ data, company, rates }) {
             <td className="border border-gray-200 px-3 py-1.5">{it.description}</td>
             <td className="border border-gray-200 px-3 py-1.5 text-right">{Number(it.qty||0).toLocaleString('id-ID')}</td>
             <td className="border border-gray-200 px-3 py-1.5">{it.unit}</td>
-            <td className="border border-gray-200 px-3 py-1.5 text-right">{formatIDR(parseFloat(it.unitPrice)||0)}</td>
-            <td className="border border-gray-200 px-3 py-1.5 text-right">{formatIDR((parseFloat(it.qty)||0)*(parseFloat(it.unitPrice)||0))}</td>
+            <td className="border border-gray-200 px-3 py-1.5 text-right">{formatIDR2(parseFloat(it.unitPrice)||0)}</td>
+            <td className="border border-gray-200 px-3 py-1.5 text-right">{formatIDR2((parseFloat(it.qty)||0)*(parseFloat(it.unitPrice)||0))}</td>
           </tr>
         ))}</tbody>
         <tfoot>
-          <tr><td colSpan={5} className="border border-gray-200 px-3 py-1.5 text-right font-semibold">Subtotal</td><td className="border border-gray-200 px-3 py-1.5 text-right font-semibold">{formatIDR(subtotal)}</td></tr>
-          <tr><td colSpan={5} className="border border-gray-200 px-3 py-1.5 text-right">PPN {rates?.ppn||11}%</td><td className="border border-gray-200 px-3 py-1.5 text-right">{formatIDR(taxAmt)}</td></tr>
-          <tr className="bg-blue-50"><td colSpan={5} className="border border-gray-200 px-3 py-2 text-right font-bold text-blue-900">TOTAL</td><td className="border border-gray-200 px-3 py-2 text-right font-bold text-blue-900">{formatIDR(grandTotal)}</td></tr>
+          <tr><td colSpan={5} className="border border-gray-200 px-3 py-1.5 text-right font-semibold">Subtotal</td><td className="border border-gray-200 px-3 py-1.5 text-right font-semibold">{formatIDR2(subtotal)}</td></tr>
+          <tr><td colSpan={5} className="border border-gray-200 px-3 py-1.5 text-right">PPN {rates?.ppn||11}%</td><td className="border border-gray-200 px-3 py-1.5 text-right">{formatIDR2(taxAmt)}</td></tr>
+          <tr className="bg-blue-50"><td colSpan={5} className="border border-gray-200 px-3 py-2 text-right font-bold text-blue-900">TOTAL</td><td className="border border-gray-200 px-3 py-2 text-right font-bold text-blue-900">{formatIDR2(grandTotal)}</td></tr>
         </tfoot>
       </table>
       <p className="text-xs italic text-gray-600 mb-5">Terbilang: <b>{terbilang(grandTotal)}</b></p>

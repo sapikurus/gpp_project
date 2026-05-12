@@ -1,21 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../../App.jsx';
-import { fetchCollection, createNumberedDoc, POS_REF } from '../../firebase.js';
+import { fetchCollection, createNumberedDoc, updateSubDoc, POS_REF, applyApprovalDirect } from '../../firebase.js';
 import { formatIDR, formatDateID, buildPONumber, today, terbilang } from '../../utils/utils.js';
+import { getChain, firstPending, nextStatus, isEditable, isApproved, canDelete } from '../../utils/approvalUtils.js';
+import ApprovalPanel, { StatusBadge, DraftWatermark } from '../Layout/ApprovalPanel.jsx';
 import PrintWrapper from '../Layout/PrintWrapper.jsx';
 import logo from '../../assets/gpp-logo.png';
 
 const BLANK_ITEM = () => ({ id:Date.now().toString()+Math.random(), description:'', qty:'', unit:'Liter', unitPrice:'', discount:'' });
-const INIT = { poDate:today(), vendorName:'', vendorAddr:'', vendorNPWP:'', shipTo:'', items:[BLANK_ITEM()], applyPBBKB:false, pbbkbProvince:'', applyPPH:false, applyBPHBuy:false, notes:'' };
+const INIT = { poDate:today(), vendorName:'', vendorAddr:'', vendorNPWP:'', shipTo:'', items:[BLANK_ITEM()], applyPBBKB:false, pbbkbProvince:'', applyPPH:false, applyBPHBuy:false, notes:'', approvalStatus:'draft', approvalHistory:[] };
 
 export default function PurchaseOrder() {
-  const { appData } = useApp();
+  const { appData, user, userRole } = useApp();
   const [form, setForm] = useState(INIT);
   const [pos, setPOs] = useState([]);
   const [printing, setPrinting] = useState(null);
+  const [showApproval, setShowApproval] = useState(null);
   const [saving, setSaving] = useState(false);
   const [loadingList, setLL] = useState(true);
   const suppliers = appData?.suppliers || [], pbbkbProvinces = appData?.pbbkbProvinces || [], rates = appData?.rates || {};
+  const chain = getChain(appData?.settings, 'po');
 
   useEffect(() => { fetchCollection(POS_REF()).then(p => { setPOs(p); setLL(false); }); }, []);
 
@@ -48,11 +52,52 @@ export default function PurchaseOrder() {
     } finally { setSaving(false); }
   };
 
-  const co = appData?.company || {};
+  const handleApprove = async (po, note) => {
+    setSaving(true);
+    try {
+      const next = nextStatus(chain, po.approvalStatus);
+      await applyApprovalDirect(POS_REF(), po.id, po.approvalHistory, { action:'approve', nextApprovalStatus:next, role:userRole, email:user.email, note });
+      setPOs(await fetchCollection(POS_REF())); setShowApproval(null);
+    } finally { setSaving(false); }
+  };
+  const handleReject = async (po, note) => {
+    setSaving(true);
+    try {
+      await applyApprovalDirect(POS_REF(), po.id, po.approvalHistory, { action:'reject', nextApprovalStatus:'rejected', role:userRole, email:user.email, note });
+      setPOs(await fetchCollection(POS_REF())); setShowApproval(null);
+    } finally { setSaving(false); }
+  };
+  const handleSubmit = async (po) => {
+    setSaving(true);
+    try {
+      await applyApprovalDirect(POS_REF(), po.id, po.approvalHistory, { action:'submit', nextApprovalStatus:firstPending(chain), role:userRole, email:user.email, note:'' });
+      setPOs(await fetchCollection(POS_REF())); setShowApproval(null);
+    } finally { setSaving(false); }
+  };
+
+  const co = appData?.headOffice || appData?.company || {};
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto pt-14 md:pt-6">
-      {printing && <PrintWrapper onClose={() => setPrinting(null)}><POPrint data={printing} company={co} rates={rates} pbbkbProvinces={pbbkbProvinces} /></PrintWrapper>}
+      {printing && <PrintWrapper onClose={() => setPrinting(null)}><DraftWatermark status={printing.approvalStatus}/><POPrint data={printing} company={co} rates={rates} pbbkbProvinces={pbbkbProvinces} /></PrintWrapper>}
+
+      {/* Approval modal */}
+      {showApproval && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between p-5 border-b">
+              <h2 className="font-bold text-gray-800">{showApproval.docNumber}</h2>
+              <button onClick={()=>setShowApproval(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div className="p-5 space-y-3">
+              <div className="text-sm text-gray-600"><b>{showApproval.vendorName}</b> · {formatIDR(showApproval.totalOrder)}</div>
+              <ApprovalPanel doc={showApproval} docType="po" chain={chain} userRole={userRole} userEmail={user?.email}
+                onSubmit={()=>handleSubmit(showApproval)} onApprove={note=>handleApprove(showApproval,note)} onReject={note=>handleReject(showApproval,note)} saving={saving}/>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Purchase Order</h1>
         <button onClick={saveAndPrint} disabled={saving} className="bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-50">{saving ? '⏳' : '🖨️ Simpan & Cetak'}</button>
@@ -145,11 +190,18 @@ export default function PurchaseOrder() {
             {loadingList ? <p className="text-gray-400 text-sm">Memuat…</p> : pos.length===0 ? <p className="text-gray-400 text-sm">Belum ada PO.</p> : (
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {pos.map(p => (
-                  <div key={p.id} onClick={() => setPrinting(p)} className="border border-gray-100 rounded-lg p-2.5 hover:border-blue-200 cursor-pointer">
-                    <p className="text-xs font-mono text-blue-600">{p.docNumber}</p>
+                  <div key={p.id} className="border border-gray-100 rounded-lg p-2.5 hover:border-blue-100">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs font-mono text-blue-600">{p.docNumber}</p>
+                      <StatusBadge status={p.approvalStatus||'draft'}/>
+                    </div>
                     <p className="text-sm text-gray-700 truncate">{p.vendorName||'-'}</p>
-                    <div className="flex justify-between text-xs text-gray-400 mt-0.5">
-                      <span>{formatDateID(p.poDate)}</span><span className="font-mono">{formatIDR(p.totalOrder)}</span>
+                    <div className="flex items-center justify-between mt-1.5 gap-2">
+                      <span className="text-xs text-gray-400 font-mono">{formatIDR(p.totalOrder)}</span>
+                      <div className="flex gap-1.5">
+                        <button onClick={()=>setShowApproval(p)} className="text-xs text-blue-600 border border-blue-100 px-2 py-0.5 rounded hover:bg-blue-50">Approval</button>
+                        <button onClick={()=>setPrinting(p)} className="text-xs text-gray-500 border border-gray-100 px-2 py-0.5 rounded hover:bg-gray-50">🖨️</button>
+                      </div>
                     </div>
                   </div>
                 ))}

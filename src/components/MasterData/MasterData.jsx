@@ -391,59 +391,104 @@ function Settings() {
   const { appData, reload } = useApp();
   const [endpoint, setEndpoint] = useState(appData?.settings?.mopsEndpoint || '');
   const [savingEP, setSavingEP] = useState(false);
-  const [savedEP, setSavedEP] = useState(false);
+  const [savedEP, setSavedEP]   = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [msg, setMsg] = useState('');
+  const [userRoles, setUserRoles] = useState(appData?.userRoles || {});
+  const [newEmail, setNewEmail] = useState('');
+  const [newRole, setNewRole]   = useState('staff');
+  const [savingUsers, setSavingUsers] = useState(false);
+  const [savedUsers, setSavedUsers]   = useState(false);
+  const defaultChain = { po:['manager','director'], so:['manager','director'], ol:['manager','director'] };
+  const [chains, setChains] = useState({ ...defaultChain, ...(appData?.settings?.approvalChain||{}) });
+  const [savingChain, setSavingChain] = useState(false);
+  const [savedChain, setSavedChain]   = useState(false);
 
-  const saveEndpoint = async () => {
-    setSavingEP(true);
-    try { await patchField('settings', { ...(appData?.settings||{}), mopsEndpoint: endpoint }); await reload(); setSavedEP(true); setTimeout(()=>setSavedEP(false),2500); }
-    finally { setSavingEP(false); }
-  };
-  const doExport = async () => {
-    setExporting(true);
-    try { const data=await exportBackup(); const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`gpp-backup-${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(url); setMsg('✅ Backup berhasil diunduh.'); }
-    catch(e){setMsg('❌ Export gagal: '+e.message);}
-    finally{setExporting(false);setTimeout(()=>setMsg(''),4000);}
-  };
-  const doImport = async (e) => {
-    const file=e.target.files[0]; if(!file)return;
-    if(!confirm('Restore backup ini? Data master akan ditimpa (counters tidak direset).'))return;
-    setImporting(true);
-    try { const json=JSON.parse(await file.text()); await importBackup(json); await reload(); setMsg('✅ Restore berhasil.'); }
-    catch(err){setMsg('❌ Import gagal: '+err.message);}
-    finally{setImporting(false);e.target.value='';setTimeout(()=>setMsg(''),4000);}
-  };
+  const ROLES = ['superadmin','director','manager','staff'];
+  const ROLE_LABELS = { superadmin:'Super Admin', director:'Direktur', manager:'Manager', staff:'Staff' };
+  const DOC_TYPES = [['po','Purchase Order'],['so','Sales Order'],['ol','Surat Penawaran']];
+  const CHAIN_ROLES = ['manager','director'];
+
+  const addUser = () => { if(!newEmail)return; setUserRoles(p=>({...p,[newEmail.toLowerCase()]:newRole})); setNewEmail(''); setNewRole('staff'); };
+  const removeUser = email => setUserRoles(p=>{const c={...p};delete c[email];return c;});
+  const saveUsers = async () => { setSavingUsers(true); try{await patchField('userRoles',userRoles);await reload();setSavedUsers(true);setTimeout(()=>setSavedUsers(false),2500);}finally{setSavingUsers(false);} };
+  const toggleChainRole = (dt,role) => setChains(p=>{const cur=p[dt]||[];const has=cur.includes(role);let next=has?cur.filter(r=>r!==role):[...cur,role];next=CHAIN_ROLES.filter(r=>next.includes(r));if(next.length===0)next=['director'];return{...p,[dt]:next};});
+  const saveChain = async () => { setSavingChain(true); try{await patchField('settings',{...(appData?.settings||{}),approvalChain:chains});await reload();setSavedChain(true);setTimeout(()=>setSavedChain(false),2500);}finally{setSavingChain(false);} };
+  const saveEndpoint = async () => { setSavingEP(true); try{await patchField('settings',{...(appData?.settings||{}),mopsEndpoint:endpoint});await reload();setSavedEP(true);setTimeout(()=>setSavedEP(false),2500);}finally{setSavingEP(false);} };
+  const doExport = async () => { setExporting(true); try{const data=await exportBackup();const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`gpp-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(url);setMsg('✅ Backup berhasil diunduh.');}catch(e){setMsg('❌ Export gagal: '+e.message);}finally{setExporting(false);setTimeout(()=>setMsg(''),4000);} };
+  const doImport = async (e) => { const file=e.target.files[0];if(!file)return;if(!confirm('Restore backup ini?'))return;setImporting(true);try{const json=JSON.parse(await file.text());await importBackup(json);await reload();setMsg('✅ Restore berhasil.');}catch(err){setMsg('❌ Import gagal: '+err.message);}finally{setImporting(false);e.target.value='';setTimeout(()=>setMsg(''),4000);} };
 
   return (
     <div>
-      <Card title="📡 Konfigurasi MOPS Endpoint">
-        <p className="text-xs text-gray-400 mb-4">URL Google Apps Script Web App untuk data MOPS. Sama dengan endpoint FuelOps PPS.</p>
+      <Card title="👥 Users & Roles">
+        <p className="text-xs text-gray-400 mb-4">Atur role setiap pengguna. Email harus terdaftar di Firebase Authentication.</p>
+        <div className="flex gap-2 mb-4 flex-wrap">
+          <input type="email" value={newEmail} onChange={e=>setNewEmail(e.target.value)} placeholder="email@perusahaan.com"
+            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"/>
+          <select value={newRole} onChange={e=>setNewRole(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none bg-white">
+            {ROLES.map(r=><option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+          </select>
+          <button onClick={addUser} className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-800">+ Tambah</button>
+        </div>
+        {Object.keys(userRoles).length===0
+          ? <p className="text-gray-400 text-xs italic mb-4">Belum ada user — semua login default ke Staff.</p>
+          : <div className="space-y-2 mb-4">{Object.entries(userRoles).map(([email,role])=>(
+              <div key={email} className="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2.5 bg-gray-50">
+                <div className="flex items-center gap-3">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white ${role==='superadmin'||role==='director'?'bg-blue-700':role==='manager'?'bg-teal-600':'bg-gray-500'}`}>{ROLE_LABELS[role]||role}</span>
+                  <span className="text-sm text-gray-700 font-mono">{email}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <select value={role} onChange={e=>setUserRoles(p=>({...p,[email]:e.target.value}))} className="border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none bg-white">
+                    {ROLES.map(r=><option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                  </select>
+                  <button onClick={()=>removeUser(email)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                </div>
+              </div>
+            ))}</div>
+        }
+        <div className="flex justify-end"><button onClick={saveUsers} disabled={savingUsers} className="bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-60">{savingUsers?'⏳':savedUsers?'✅ Tersimpan':'💾 Simpan Users'}</button></div>
+      </Card>
+
+      <Card title="⛓️ Konfigurasi Approval Chain">
+        <p className="text-xs text-gray-400 mb-4">Atur siapa yang perlu menyetujui setiap dokumen. Minimal satu approver.</p>
+        <div className="space-y-3 mb-4">
+          {DOC_TYPES.map(([dt,label])=>(
+            <div key={dt} className="flex items-center justify-between border border-gray-100 rounded-lg px-4 py-3 flex-wrap gap-3">
+              <p className="text-sm font-medium text-gray-700 w-36">{label}</p>
+              <div className="flex gap-4">{CHAIN_ROLES.map(role=>(
+                <label key={role} className="flex items-center gap-2 cursor-pointer text-sm">
+                  <input type="checkbox" checked={(chains[dt]||[]).includes(role)} onChange={()=>toggleChainRole(dt,role)} className="rounded w-4 h-4"/>
+                  <span className="text-gray-600">{role==='director'?'Direktur':'Manager'}</span>
+                </label>
+              ))}</div>
+              <div className="flex gap-1">{(chains[dt]||[]).map(r=><span key={r} className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold capitalize">{r}</span>)}</div>
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-end"><button onClick={saveChain} disabled={savingChain} className="bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-60">{savingChain?'⏳':savedChain?'✅ Tersimpan':'💾 Simpan Chain'}</button></div>
+      </Card>
+
+      <Card title="📡 MOPS Endpoint">
         <div className="flex gap-2">
           <input type="text" value={endpoint} onChange={e=>setEndpoint(e.target.value)} placeholder="https://script.google.com/macros/s/..."
             className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 font-mono text-xs"/>
-          <button onClick={saveEndpoint} disabled={savingEP} className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-60 shrink-0">
-            {savingEP?'⏳':savedEP?'✅':'💾 Simpan'}
-          </button>
+          <button onClick={saveEndpoint} disabled={savingEP} className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-60 shrink-0">{savingEP?'⏳':savedEP?'✅':'💾'}</button>
         </div>
-        {endpoint && <p className="text-xs text-green-600 mt-2">✅ Endpoint terkonfigurasi</p>}
+        {endpoint&&<p className="text-xs text-green-600 mt-2">✅ Endpoint terkonfigurasi</p>}
       </Card>
+
       <Card title="💾 Backup & Restore">
         <div className="space-y-4">
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800"><b>⚠️ Selalu backup sebelum melakukan perubahan besar.</b></div>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800"><b>⚠️ Selalu backup sebelum perubahan besar.</b></div>
           <div className="flex gap-3 flex-wrap">
-            <button onClick={doExport} disabled={exporting} className="bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-60">{exporting?'⏳ Mengekspor…':'⬇️ Export Backup JSON'}</button>
+            <button onClick={doExport} disabled={exporting} className="bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-60">{exporting?'⏳':'⬇️ Export JSON'}</button>
             <label className={`flex items-center gap-2 bg-white border border-gray-300 px-5 py-2.5 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer ${importing?'opacity-60 pointer-events-none':''}`}>
-              {importing?'⏳ Mengimpor…':'⬆️ Import / Restore JSON'}<input type="file" accept=".json" onChange={doImport} className="hidden"/>
+              {importing?'⏳':'⬆️ Import JSON'}<input type="file" accept=".json" onChange={doImport} className="hidden"/>
             </label>
           </div>
           {msg&&<div className={`rounded-lg px-4 py-3 text-sm ${msg.startsWith('✅')?'bg-green-50 text-green-700':'bg-red-50 text-red-700'}`}>{msg}</div>}
-          <div className="text-xs text-gray-400 space-y-1 pt-2 border-t">
-            <p><b>Export</b> — mengunduh semua data ke file JSON.</p>
-            <p><b>Import</b> — mengembalikan master data. Counters tidak direset.</p>
-            <p><b>Tambah user baru</b> — Firebase Console → Authentication → Add user.</p>
-          </div>
         </div>
       </Card>
     </div>

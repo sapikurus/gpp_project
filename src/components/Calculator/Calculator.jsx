@@ -4,7 +4,16 @@ import { fetchCollection, createNumberedDoc, CALCS_REF, CARGOS_REF } from '../..
 import { formatIDR, today, daysBetween } from '../../utils/utils.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const n = (v) => parseFloat(v) || 0;
+const n = (v) => {
+  if (v == null || v === '') return 0;
+  const s = String(v);
+  // Handle id-ID format: multiple dots as thousand sep, comma as decimal
+  const dotCount = (s.match(/\./g) || []).length;
+  if (dotCount > 1 || (dotCount === 1 && s.includes(','))) {
+    return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
+  }
+  return parseFloat(s) || 0;
+};
 const fmt2 = (v) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
 const fmtPct = (v) => (v != null ? (v >= 0 ? '+' : '') + fmt2(v) + '%' : '–');
 const addDays = (dateStr, days) => {
@@ -40,11 +49,33 @@ const Field = ({ label, children, sub }) => (
   </div>
 );
 
-const Inp = ({ value, onChange, type = 'number', placeholder = '0', step = 'any' }) => (
-  <input type={type} step={step} value={value} onChange={e => onChange(e.target.value)}
-    placeholder={placeholder}
+// Date input (unchanged)
+const DateInp = ({ value, onChange }) => (
+  <input type="date" value={value} onChange={e => onChange(e.target.value)}
     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 font-mono" />
 );
+
+// Number input with thousand-separator display when blurred, raw when focused
+const Inp = ({ value, onChange, placeholder = '0' }) => {
+  const [focused, setFocused] = useState(false);
+  const fmtDisplay = (v) => {
+    if (v === '' || v == null) return '';
+    const num = parseFloat(String(v));
+    if (isNaN(num)) return v;
+    return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 4 }).format(num);
+  };
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={focused ? (value ?? '') : fmtDisplay(value)}
+      placeholder={placeholder}
+      onFocus={e => { setFocused(true); setTimeout(() => e.target.select(), 0); }}
+      onBlur={() => setFocused(false)}
+      onChange={e => onChange(e.target.value)}
+      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 font-mono" />
+  );
+};
 
 const Sel = ({ value, onChange, children }) => (
   <select value={value} onChange={e => onChange(e.target.value)}
@@ -233,7 +264,7 @@ export default function Calculator() {
         {/* Cost of Money */}
         <InputCard title="Cost of Money">
           <Field label="Offering Date">
-            <Inp type="date" value={form.offeringDate} onChange={set('offeringDate')} />
+            <DateInp value={form.offeringDate} onChange={set('offeringDate')} />
           </Field>
           <Field label="Client TOP" sub="days">
             <Inp value={form.clientTOP} onChange={set('clientTOP')} />
