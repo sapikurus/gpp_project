@@ -437,217 +437,207 @@ function SupplierForm({ supplier, onChange, onSave, onCancel, saveLabel }) {
 
 function Clients() {
   const { appData, reload } = useApp();
-  const [items, setItems] = useState(appData?.clients || []);
-  const { save, saving, saved } = useSave('clients', () => items, reload, appData);
-  const [editingId, setEditingId] = useState(null);
-  const [showNew, setShowNew] = useState(false);
+  const [items, setItems]   = useState(appData?.clients || []);
+  const [view, setView]     = useState('list'); // 'list' | 'form'
+  const [formData, setForm] = useState(null);
+  const [saving, setSaving] = useState(false);
 
-  // Sync when appData loads (prevents data-loss if component mounted before data arrived)
-  useEffect(() => {
-    if (appData?.clients) setItems(appData.clients);
-  }, [appData]);
+  useEffect(() => { if (appData?.clients) setItems(appData.clients); }, [appData]);
 
-  const blankClient = () => ({
-    id: Date.now().toString() + Math.random(),
-    name: '', code: '', address: '', npwp: '', contact: '', top: '', email: '',
-    addressRows: 3,
-  });
-  const [newClient, setNewClient] = useState(blankClient());
+  const blank = () => ({ id: Date.now().toString()+Math.random(), name:'', code:'', address:'', npwp:'', contact:'', email:'', top:'', addressRows:3 });
 
-  const addClient = () => {
-    if (!newClient.name) return;
-    setItems(p => [...p, { ...newClient }]);
-    setNewClient(blankClient());
-    setShowNew(false);
+  const openNew  = () => { setForm(blank()); setView('form'); };
+  const openEdit = (c) => { setForm({ ...c }); setView('form'); };
+  const cancel   = () => { setView('list'); setForm(null); };
+
+  const saveEntry = async () => {
+    if (!formData?.name) return;
+    if (!appData) { alert('Data belum dimuat, coba lagi.'); return; }
+    setSaving(true);
+    try {
+      const isEdit = items.some(x => x.id === formData.id);
+      const next   = isEdit ? items.map(x => x.id === formData.id ? { ...formData } : x)
+                             : [...items, { ...formData }];
+      await patchField('clients', next);
+      await reload();
+      setItems(next);
+      setView('list');
+      setForm(null);
+    } finally { setSaving(false); }
   };
-  const updateClient = (id, k, v) => setItems(p => p.map(x => x.id === id ? { ...x, [k]: v } : x));
-  const removeClient = (id) => setItems(p => p.filter(x => x.id !== id));
 
+  const removeClient = async (id) => {
+    if (!confirm('Hapus client ini?')) return;
+    const next = items.filter(x => x.id !== id);
+    await patchField('clients', next);
+    setItems(next);
+    await reload();
+  };
+
+  // ── Form view ──
+  if (view === 'form') return (
+    <Card title={formData && items.some(x=>x.id===formData.id) ? '✏️ Edit Client' : '➕ Client Baru'}>
+      <ClientForm
+        client={formData || blank()}
+        onChange={(k, v) => setForm(p => ({ ...p, [k]: v }))}
+        onSave={null}
+        onCancel={null}
+        saveLabel=""
+      />
+      <div className="flex gap-2 mt-4">
+        <button onClick={saveEntry} disabled={saving || !formData?.name}
+          className="bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-50">
+          {saving ? '⏳ Menyimpan…' : '💾 Simpan'}
+        </button>
+        <button onClick={cancel}
+          className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+          Batal
+        </button>
+      </div>
+    </Card>
+  );
+
+  // ── List view ──
   return (
-    <div>
-      <SaveBtn onSave={save} saving={saving} saved={saved} />
-      <Card title="👥 Client Database"
-        action={!showNew && (
-          <button onClick={() => setShowNew(true)}
-            className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-100 font-medium">
-            + Tambah Client
-          </button>
-        )}>
-        <p className="text-xs text-gray-400 mb-4">
-          Kode client digunakan dalam nomor surat penawaran. Alamat multi-baris tampil di surat.
-        </p>
-
-        {showNew && (
-          <div className="mb-4">
-            <ClientForm
-              client={newClient}
-              onChange={(k, v) => setNewClient(p => ({ ...p, [k]: v }))}
-              onSave={addClient}
-              onCancel={() => { setShowNew(false); setNewClient(blankClient()); }}
-              saveLabel="+ Tambah Client"
-            />
+    <Card title="👥 Client Database"
+      action={
+        <button onClick={openNew}
+          className="bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-800">
+          + New Entry
+        </button>
+      }>
+      <p className="text-xs text-gray-400 mb-4">
+        Kode client digunakan dalam nomor surat. Klik entry untuk edit. Data disimpan langsung ke Firestore.
+      </p>
+      {items.length === 0
+        ? <p className="text-gray-400 text-xs italic text-center py-6">Belum ada client. Klik "+ New Entry" untuk menambahkan.</p>
+        : <div className="space-y-2">
+            {items.map(client => (
+              <div key={client.id} className="border border-gray-100 rounded-xl p-4 hover:bg-gray-50 hover:border-blue-100 transition-colors">
+                <div className="flex items-start justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-gray-800 text-sm">{client.name}</span>
+                    {client.code && <span className="text-[10px] font-mono font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded">{client.code}</span>}
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button onClick={() => openEdit(client)} className="text-xs text-blue-600 border border-blue-100 px-2 py-0.5 rounded hover:bg-blue-50">✏️ Edit</button>
+                    <button onClick={() => removeClient(client.id)} className="text-xs text-red-400 border border-red-100 px-2 py-0.5 rounded hover:bg-red-50">✕</button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-gray-500">
+                  {client.address && <div className="col-span-2"><span className="text-gray-400">Alamat: </span>{client.address.split('\n').filter(Boolean).join(', ')}</div>}
+                  {client.npwp    && <div><span className="text-gray-400">NPWP: </span>{client.npwp}</div>}
+                  {client.contact && <div><span className="text-gray-400">PIC: </span>{client.contact}</div>}
+                  {client.email   && <div><span className="text-gray-400">Email: </span>{client.email}</div>}
+                  {client.top     && <div><span className="text-gray-400">TOP: </span>{client.top} hari</div>}
+                </div>
+              </div>
+            ))}
           </div>
-        )}
-
-        {items.length === 0 && !showNew && (
-          <p className="text-gray-400 text-xs italic text-center py-4">Belum ada client.</p>
-        )}
-
-        <div className="space-y-3">
-          {items.map(client => (
-            <div key={client.id} className="border border-gray-100 rounded-xl overflow-hidden">
-              {editingId === client.id ? (
-                <div className="p-4">
-                  <ClientForm
-                    client={client}
-                    onChange={(k, v) => updateClient(client.id, k, v)}
-                    onSave={() => setEditingId(null)}
-                    onCancel={() => setEditingId(null)}
-                    saveLabel="✓ Selesai Edit"
-                  />
-                </div>
-              ) : (
-                <div className="p-4 hover:bg-gray-50">
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-gray-800 text-sm">{client.name}</span>
-                      {client.code && (
-                        <span className="text-[10px] font-mono font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                          {client.code}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => setEditingId(client.id)}
-                        className="text-xs text-blue-600 border border-blue-100 px-2 py-0.5 rounded hover:bg-blue-50">✏️ Edit</button>
-                      <button onClick={() => removeClient(client.id)}
-                        className="text-xs text-red-400 border border-red-100 px-2 py-0.5 rounded hover:bg-red-50">✕</button>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-500">
-                    {client.address && (
-                      <div className="col-span-2">
-                        <span className="text-gray-400">Alamat: </span>
-                        {client.address.split('\n').map((line, i) => (
-                          <span key={i}>{i > 0 ? ', ' : ''}{line}</span>
-                        ))}
-                      </div>
-                    )}
-                    {client.npwp    && <div><span className="text-gray-400">NPWP: </span>{client.npwp}</div>}
-                    {client.contact && <div><span className="text-gray-400">PIC: </span>{client.contact}</div>}
-                    {client.email   && <div><span className="text-gray-400">Email: </span>{client.email}</div>}
-                    {client.top     && <div><span className="text-gray-400">TOP: </span>{client.top} hari</div>}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </Card>
-    </div>
+      }
+    </Card>
   );
 }
+
 function Suppliers() {
   const { appData, reload } = useApp();
-  const [items, setItems] = useState(appData?.suppliers || []);
-  const { save, saving, saved } = useSave('suppliers', () => items, reload, appData);
-  const [editingId, setEditingId] = useState(null);
-  const [showNew, setShowNew] = useState(false);
+  const [items, setItems]   = useState(appData?.suppliers || []);
+  const [view, setView]     = useState('list');
+  const [formData, setForm] = useState(null);
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (appData?.suppliers) setItems(appData.suppliers);
-  }, [appData]);
+  useEffect(() => { if (appData?.suppliers) setItems(appData.suppliers); }, [appData]);
 
-  const blankSupplier = () => ({
-    id: Date.now().toString() + Math.random(),
-    name: '', address: '', npwp: '', contact: '', email: '', phone: '', addressRows: 2,
-  });
-  const [newSupplier, setNewSupplier] = useState(blankSupplier());
+  const blank = () => ({ id: Date.now().toString()+Math.random(), name:'', address:'', npwp:'', contact:'', email:'', phone:'', addressRows:2 });
 
-  const addSupplier = () => {
-    if (!newSupplier.name) return;
-    setItems(p => [...p, { ...newSupplier }]);
-    setNewSupplier(blankSupplier());
-    setShowNew(false);
+  const openNew  = () => { setForm(blank()); setView('form'); };
+  const openEdit = (s) => { setForm({ ...s }); setView('form'); };
+  const cancel   = () => { setView('list'); setForm(null); };
+
+  const saveEntry = async () => {
+    if (!formData?.name) return;
+    if (!appData) { alert('Data belum dimuat, coba lagi.'); return; }
+    setSaving(true);
+    try {
+      const isEdit = items.some(x => x.id === formData.id);
+      const next   = isEdit ? items.map(x => x.id === formData.id ? { ...formData } : x)
+                             : [...items, { ...formData }];
+      await patchField('suppliers', next);
+      await reload();
+      setItems(next);
+      setView('list');
+      setForm(null);
+    } finally { setSaving(false); }
   };
-  const updateSupplier = (id, k, v) => setItems(p => p.map(x => x.id === id ? { ...x, [k]: v } : x));
-  const removeSupplier = (id) => setItems(p => p.filter(x => x.id !== id));
 
+  const removeSupplier = async (id) => {
+    if (!confirm('Hapus supplier ini?')) return;
+    const next = items.filter(x => x.id !== id);
+    await patchField('suppliers', next);
+    setItems(next);
+    await reload();
+  };
+
+  // ── Form view ──
+  if (view === 'form') return (
+    <Card title={formData && items.some(x=>x.id===formData.id) ? '✏️ Edit Supplier' : '➕ Supplier Baru'}>
+      <SupplierForm
+        supplier={formData || blank()}
+        onChange={(k, v) => setForm(p => ({ ...p, [k]: v }))}
+        onSave={null}
+        onCancel={null}
+        saveLabel=""
+      />
+      <div className="flex gap-2 mt-4">
+        <button onClick={saveEntry} disabled={saving || !formData?.name}
+          className="bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-50">
+          {saving ? '⏳ Menyimpan…' : '💾 Simpan'}
+        </button>
+        <button onClick={cancel}
+          className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+          Batal
+        </button>
+      </div>
+    </Card>
+  );
+
+  // ── List view ──
   return (
-    <div>
-      <SaveBtn onSave={save} saving={saving} saved={saved} />
-      <Card title="🏭 Supplier Database"
-        action={!showNew && (
-          <button onClick={() => setShowNew(true)}
-            className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-100 font-medium">
-            + Tambah Supplier
-          </button>
-        )}>
-        <p className="text-xs text-gray-400 mb-4">Tersedia sebagai pilihan di Purchase Order.</p>
-
-        {showNew && (
-          <div className="mb-4">
-            <SupplierForm
-              supplier={newSupplier}
-              onChange={(k, v) => setNewSupplier(p => ({ ...p, [k]: v }))}
-              onSave={addSupplier}
-              onCancel={() => { setShowNew(false); setNewSupplier(blankSupplier()); }}
-              saveLabel="+ Tambah Supplier"
-            />
+    <Card title="🏭 Supplier Database"
+      action={
+        <button onClick={openNew}
+          className="bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-800">
+          + New Entry
+        </button>
+      }>
+      <p className="text-xs text-gray-400 mb-4">Tersedia sebagai pilihan di Purchase Order. Data disimpan langsung ke Firestore.</p>
+      {items.length === 0
+        ? <p className="text-gray-400 text-xs italic text-center py-6">Belum ada supplier. Klik "+ New Entry" untuk menambahkan.</p>
+        : <div className="space-y-2">
+            {items.map(s => (
+              <div key={s.id} className="border border-gray-100 rounded-xl p-4 hover:bg-gray-50 hover:border-blue-100 transition-colors">
+                <div className="flex items-start justify-between mb-1.5">
+                  <span className="font-semibold text-gray-800 text-sm">{s.name}</span>
+                  <div className="flex gap-1.5">
+                    <button onClick={() => openEdit(s)} className="text-xs text-blue-600 border border-blue-100 px-2 py-0.5 rounded hover:bg-blue-50">✏️ Edit</button>
+                    <button onClick={() => removeSupplier(s.id)} className="text-xs text-red-400 border border-red-100 px-2 py-0.5 rounded hover:bg-red-50">✕</button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-gray-500">
+                  {s.address && <div className="col-span-2"><span className="text-gray-400">Alamat: </span>{s.address.split('\n').filter(Boolean).join(', ')}</div>}
+                  {s.npwp    && <div><span className="text-gray-400">NPWP: </span>{s.npwp}</div>}
+                  {s.contact && <div><span className="text-gray-400">PIC: </span>{s.contact}</div>}
+                  {s.email   && <div><span className="text-gray-400">Email: </span>{s.email}</div>}
+                  {s.phone   && <div><span className="text-gray-400">Tel: </span>{s.phone}</div>}
+                </div>
+              </div>
+            ))}
           </div>
-        )}
-
-        {items.length === 0 && !showNew && (
-          <p className="text-gray-400 text-xs italic text-center py-4">Belum ada supplier.</p>
-        )}
-
-        <div className="space-y-3">
-          {items.map(supplier => (
-            <div key={supplier.id} className="border border-gray-100 rounded-xl overflow-hidden">
-              {editingId === supplier.id ? (
-                <div className="p-4">
-                  <SupplierForm
-                    supplier={supplier}
-                    onChange={(k, v) => updateSupplier(supplier.id, k, v)}
-                    onSave={() => setEditingId(null)}
-                    onCancel={() => setEditingId(null)}
-                    saveLabel="✓ Selesai Edit"
-                  />
-                </div>
-              ) : (
-                <div className="p-4 hover:bg-gray-50">
-                  <div className="flex items-start justify-between mb-2">
-                    <span className="font-semibold text-gray-800 text-sm">{supplier.name}</span>
-                    <div className="flex gap-2">
-                      <button onClick={() => setEditingId(supplier.id)}
-                        className="text-xs text-blue-600 border border-blue-100 px-2 py-0.5 rounded hover:bg-blue-50">✏️ Edit</button>
-                      <button onClick={() => removeSupplier(supplier.id)}
-                        className="text-xs text-red-400 border border-red-100 px-2 py-0.5 rounded hover:bg-red-50">✕</button>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-500">
-                    {supplier.address && (
-                      <div className="col-span-2">
-                        <span className="text-gray-400">Alamat: </span>
-                        {supplier.address.split('\n').map((line, i) => (
-                          <span key={i}>{i > 0 ? ', ' : ''}{line}</span>
-                        ))}
-                      </div>
-                    )}
-                    {supplier.npwp    && <div><span className="text-gray-400">NPWP: </span>{supplier.npwp}</div>}
-                    {supplier.contact && <div><span className="text-gray-400">PIC: </span>{supplier.contact}</div>}
-                    {supplier.email   && <div><span className="text-gray-400">Email: </span>{supplier.email}</div>}
-                    {supplier.phone   && <div><span className="text-gray-400">Tel: </span>{supplier.phone}</div>}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </Card>
-    </div>
+      }
+    </Card>
   );
 }
+
 
 function Products() {
   const { appData, reload } = useApp();
