@@ -78,7 +78,7 @@ export default function Sidebar() {
         <img src={logo} alt="GPP" className="w-10 h-10 object-contain bg-white rounded-full p-1 shrink-0" />
         <div className="min-w-0">
           <p className="font-bold text-xs leading-tight truncate">PT Global Petro Pasifik</p>
-          <p className="text-blue-300 text-[10px]">FuelOps</p>
+          <p className="text-blue-300 text-[10px]">GPP Portal</p>
         </div>
         <button onClick={closeSidebar} className="ml-auto text-blue-300 hover:text-white md:hidden">✕</button>
       </div>

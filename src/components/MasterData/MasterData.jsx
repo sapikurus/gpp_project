@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { useApp } from '../../App.jsx';
 import { patchField, patchData, exportBackup, importBackup } from '../../firebase.js';
@@ -285,10 +285,12 @@ const ListEditor = ({ items, schema, onChange }) => {
   );
 };
 
-function useSave(field, getData, reload) {
+function useSave(field, getData, reload, appData) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const save = async () => {
+    // Guard: never save if appData hasn't loaded — prevents wiping real data
+    if (!appData) { alert('Data belum selesai dimuat. Tunggu sebentar lalu coba lagi.'); return; }
     setSaving(true);
     try { await patchField(field, getData()); await reload(); setSaved(true); setTimeout(() => setSaved(false), 2500); }
     finally { setSaving(false); }
@@ -296,12 +298,154 @@ function useSave(field, getData, reload) {
   return { save, saving, saved };
 }
 
+// ─── ClientForm — defined at MODULE LEVEL to prevent remount on parent re-render ──
+// If defined inside Clients(), React creates a new component type on every keystroke
+// → unmount/remount → autoFocus fires → cursor jumps back to name field
+const IF = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white';
+
+function ClientForm({ client, onChange, onSave, onCancel, saveLabel }) {
+  return (
+    <div className="border border-blue-200 rounded-xl p-4 bg-blue-50 space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="col-span-2">
+          <label className="block text-xs text-gray-500 mb-1">Nama Perusahaan *</label>
+          <input type="text" value={client.name} onChange={e => onChange('name', e.target.value)}
+            placeholder="PT. Contoh Tbk."
+            className={IF}/>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Kode Client</label>
+          <input type="text" value={client.code||''} onChange={e => onChange('code', e.target.value.toUpperCase())}
+            placeholder="PTRO" maxLength={10}
+            className={IF + ' font-mono uppercase'}/>
+          <p className="text-[10px] text-gray-400 mt-0.5">Digunakan dalam nomor surat</p>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">NPWP</label>
+          <input type="text" value={client.npwp||''} onChange={e => onChange('npwp', e.target.value)}
+            placeholder="00.000.000.0-000.000" className={IF}/>
+        </div>
+        <div className="col-span-2">
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs text-gray-500">Alamat</label>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-gray-400">Baris:</span>
+              <button type="button" onClick={() => onChange('addressRows', Math.max(1, (client.addressRows||3) - 1))}
+                className="w-5 h-5 rounded border border-gray-300 text-xs flex items-center justify-center hover:bg-gray-100 bg-white">−</button>
+              <span className="text-xs text-gray-600 w-4 text-center">{client.addressRows||3}</span>
+              <button type="button" onClick={() => onChange('addressRows', Math.min(8, (client.addressRows||3) + 1))}
+                className="w-5 h-5 rounded border border-gray-300 text-xs flex items-center justify-center hover:bg-gray-100 bg-white">+</button>
+            </div>
+          </div>
+          <textarea value={client.address||''} onChange={e => onChange('address', e.target.value)}
+            rows={client.addressRows||3}
+            placeholder={"Gedung Contoh, lt 6. Unit 6-10\nJl. Pemuda no 10\nJakarta 14210"}
+            className={IF + ' resize-none font-mono'}/>
+          <p className="text-[10px] text-gray-400 mt-0.5">Setiap baris akan muncul terpisah di surat penawaran</p>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Kontak / PIC</label>
+          <input type="text" value={client.contact||''} onChange={e => onChange('contact', e.target.value)}
+            placeholder="Nama PIC" className={IF}/>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Email</label>
+          <input type="email" value={client.email||''} onChange={e => onChange('email', e.target.value)}
+            placeholder="email@perusahaan.com" className={IF}/>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">TOP Default (hari)</label>
+          <input type="number" value={client.top||''} onChange={e => onChange('top', e.target.value)}
+            placeholder="45" className={IF}/>
+        </div>
+      </div>
+      <div className="flex gap-2 pt-1">
+        <button type="button" onClick={onSave} disabled={!client.name}
+          className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-50">
+          {saveLabel || '+ Tambah'}
+        </button>
+        <button type="button" onClick={onCancel}
+          className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-white">
+          Batal
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── SupplierForm — same pattern, module level ─────────────────────────────────
+function SupplierForm({ supplier, onChange, onSave, onCancel, saveLabel }) {
+  return (
+    <div className="border border-blue-200 rounded-xl p-4 bg-blue-50 space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="col-span-2">
+          <label className="block text-xs text-gray-500 mb-1">Nama Perusahaan *</label>
+          <input type="text" value={supplier.name||''} onChange={e => onChange('name', e.target.value)}
+            placeholder="PT. Contoh Tbk." className={IF}/>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">NPWP</label>
+          <input type="text" value={supplier.npwp||''} onChange={e => onChange('npwp', e.target.value)}
+            placeholder="00.000.000.0-000.000" className={IF}/>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Kontak / PIC</label>
+          <input type="text" value={supplier.contact||''} onChange={e => onChange('contact', e.target.value)}
+            placeholder="Nama PIC" className={IF}/>
+        </div>
+        <div className="col-span-2">
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs text-gray-500">Alamat</label>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-gray-400">Baris:</span>
+              <button type="button" onClick={() => onChange('addressRows', Math.max(1, (supplier.addressRows||2) - 1))}
+                className="w-5 h-5 rounded border border-gray-300 text-xs flex items-center justify-center hover:bg-gray-100 bg-white">−</button>
+              <span className="text-xs text-gray-600 w-4 text-center">{supplier.addressRows||2}</span>
+              <button type="button" onClick={() => onChange('addressRows', Math.min(8, (supplier.addressRows||2) + 1))}
+                className="w-5 h-5 rounded border border-gray-300 text-xs flex items-center justify-center hover:bg-gray-100 bg-white">+</button>
+            </div>
+          </div>
+          <textarea value={supplier.address||''} onChange={e => onChange('address', e.target.value)}
+            rows={supplier.addressRows||2}
+            placeholder={"Jl. Contoh No. 1\nJakarta Pusat 10110"}
+            className={IF + ' resize-none font-mono'}/>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Email</label>
+          <input type="email" value={supplier.email||''} onChange={e => onChange('email', e.target.value)}
+            placeholder="email@supplier.com" className={IF}/>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Telepon</label>
+          <input type="text" value={supplier.phone||''} onChange={e => onChange('phone', e.target.value)}
+            placeholder="+62 21 xxx xxxx" className={IF}/>
+        </div>
+      </div>
+      <div className="flex gap-2 pt-1">
+        <button type="button" onClick={onSave} disabled={!supplier.name}
+          className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-50">
+          {saveLabel || '+ Tambah'}
+        </button>
+        <button type="button" onClick={onCancel}
+          className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-white">
+          Batal
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Clients() {
   const { appData, reload } = useApp();
   const [items, setItems] = useState(appData?.clients || []);
-  const { save, saving, saved } = useSave('clients', () => items, reload);
+  const { save, saving, saved } = useSave('clients', () => items, reload, appData);
   const [editingId, setEditingId] = useState(null);
   const [showNew, setShowNew] = useState(false);
+
+  // Sync when appData loads (prevents data-loss if component mounted before data arrived)
+  useEffect(() => {
+    if (appData?.clients) setItems(appData.clients);
+  }, [appData]);
 
   const blankClient = () => ({
     id: Date.now().toString() + Math.random(),
@@ -316,95 +460,19 @@ function Clients() {
     setNewClient(blankClient());
     setShowNew(false);
   };
-
-  const updateClient = (id, k, v) =>
-    setItems(p => p.map(x => x.id === id ? { ...x, [k]: v } : x));
-
+  const updateClient = (id, k, v) => setItems(p => p.map(x => x.id === id ? { ...x, [k]: v } : x));
   const removeClient = (id) => setItems(p => p.filter(x => x.id !== id));
-
-  const ClientForm = ({ client, onChange, onSave, onCancel, saveLabel = '+ Tambah' }) => (
-    <div className="border border-blue-200 rounded-xl p-4 bg-blue-50 space-y-3">
-      <div className="grid grid-cols-2 gap-3">
-        <div className="col-span-2">
-          <label className="block text-xs text-gray-500 mb-1">Nama Perusahaan *</label>
-          <input type="text" value={client.name} onChange={e => onChange('name', e.target.value)}
-            placeholder="PT. Contoh Tbk." autoFocus
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"/>
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Kode Client</label>
-          <input type="text" value={client.code||''} onChange={e => onChange('code', e.target.value.toUpperCase())}
-            placeholder="PTRO" maxLength={10}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white font-mono uppercase"/>
-          <p className="text-[10px] text-gray-400 mt-0.5">Digunakan dalam nomor surat</p>
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">NPWP</label>
-          <input type="text" value={client.npwp||''} onChange={e => onChange('npwp', e.target.value)}
-            placeholder="00.000.000.0-000.000"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"/>
-        </div>
-        <div className="col-span-2">
-          <div className="flex items-center justify-between mb-1">
-            <label className="block text-xs text-gray-500">Alamat</label>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-gray-400">Baris:</span>
-              <button onClick={() => onChange('addressRows', Math.max(1, (client.addressRows||3) - 1))}
-                className="w-5 h-5 rounded border border-gray-300 text-xs flex items-center justify-center hover:bg-gray-100 bg-white">−</button>
-              <span className="text-xs text-gray-600 w-4 text-center">{client.addressRows||3}</span>
-              <button onClick={() => onChange('addressRows', Math.min(8, (client.addressRows||3) + 1))}
-                className="w-5 h-5 rounded border border-gray-300 text-xs flex items-center justify-center hover:bg-gray-100 bg-white">+</button>
-            </div>
-          </div>
-          <textarea value={client.address||''} onChange={e => onChange('address', e.target.value)}
-            rows={client.addressRows||3}
-            placeholder={"Gedung Contoh, lt 6. Unit 6-10\nJl. Pemuda no 10\nJakarta 14210"}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white resize-none font-mono"/>
-          <p className="text-[10px] text-gray-400 mt-0.5">Setiap baris akan muncul terpisah di surat penawaran</p>
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Kontak / PIC</label>
-          <input type="text" value={client.contact||''} onChange={e => onChange('contact', e.target.value)}
-            placeholder="Nama PIC"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"/>
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Email</label>
-          <input type="email" value={client.email||''} onChange={e => onChange('email', e.target.value)}
-            placeholder="email@perusahaan.com"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"/>
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">TOP Default (hari)</label>
-          <input type="number" value={client.top||''} onChange={e => onChange('top', e.target.value)}
-            placeholder="45"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"/>
-        </div>
-      </div>
-      <div className="flex gap-2 pt-1">
-        <button onClick={onSave} disabled={!client.name}
-          className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-50">
-          {saveLabel}
-        </button>
-        <button onClick={onCancel} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-white">
-          Batal
-        </button>
-      </div>
-    </div>
-  );
 
   return (
     <div>
       <SaveBtn onSave={save} saving={saving} saved={saved} />
       <Card title="👥 Client Database"
-        action={
-          !showNew && (
-            <button onClick={() => setShowNew(true)}
-              className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-100 font-medium">
-              + Tambah Client
-            </button>
-          )
-        }>
+        action={!showNew && (
+          <button onClick={() => setShowNew(true)}
+            className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-100 font-medium">
+            + Tambah Client
+          </button>
+        )}>
         <p className="text-xs text-gray-400 mb-4">
           Kode client digunakan dalam nomor surat penawaran. Alamat multi-baris tampil di surat.
         </p>
@@ -451,13 +519,9 @@ function Clients() {
                     </div>
                     <div className="flex gap-2">
                       <button onClick={() => setEditingId(client.id)}
-                        className="text-xs text-blue-600 border border-blue-100 px-2 py-0.5 rounded hover:bg-blue-50">
-                        ✏️ Edit
-                      </button>
+                        className="text-xs text-blue-600 border border-blue-100 px-2 py-0.5 rounded hover:bg-blue-50">✏️ Edit</button>
                       <button onClick={() => removeClient(client.id)}
-                        className="text-xs text-red-400 border border-red-100 px-2 py-0.5 rounded hover:bg-red-50">
-                        ✕
-                      </button>
+                        className="text-xs text-red-400 border border-red-100 px-2 py-0.5 rounded hover:bg-red-50">✕</button>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-500">
@@ -483,16 +547,103 @@ function Clients() {
     </div>
   );
 }
-
 function Suppliers() {
   const { appData, reload } = useApp();
   const [items, setItems] = useState(appData?.suppliers || []);
-  const { save, saving, saved } = useSave('suppliers', () => items, reload);
+  const { save, saving, saved } = useSave('suppliers', () => items, reload, appData);
+  const [editingId, setEditingId] = useState(null);
+  const [showNew, setShowNew] = useState(false);
+
+  useEffect(() => {
+    if (appData?.suppliers) setItems(appData.suppliers);
+  }, [appData]);
+
+  const blankSupplier = () => ({
+    id: Date.now().toString() + Math.random(),
+    name: '', address: '', npwp: '', contact: '', email: '', phone: '', addressRows: 2,
+  });
+  const [newSupplier, setNewSupplier] = useState(blankSupplier());
+
+  const addSupplier = () => {
+    if (!newSupplier.name) return;
+    setItems(p => [...p, { ...newSupplier }]);
+    setNewSupplier(blankSupplier());
+    setShowNew(false);
+  };
+  const updateSupplier = (id, k, v) => setItems(p => p.map(x => x.id === id ? { ...x, [k]: v } : x));
+  const removeSupplier = (id) => setItems(p => p.filter(x => x.id !== id));
+
   return (
-    <div><SaveBtn onSave={save} saving={saving} saved={saved} />
-      <Card title="🏭 Supplier Database">
+    <div>
+      <SaveBtn onSave={save} saving={saving} saved={saved} />
+      <Card title="🏭 Supplier Database"
+        action={!showNew && (
+          <button onClick={() => setShowNew(true)}
+            className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-100 font-medium">
+            + Tambah Supplier
+          </button>
+        )}>
         <p className="text-xs text-gray-400 mb-4">Tersedia sebagai pilihan di Purchase Order.</p>
-        <ListEditor items={items} onChange={setItems} schema={[{key:'name',label:'Nama'},{key:'address',label:'Alamat'},{key:'contact',label:'Kontak'},{key:'npwp',label:'NPWP'}]} />
+
+        {showNew && (
+          <div className="mb-4">
+            <SupplierForm
+              supplier={newSupplier}
+              onChange={(k, v) => setNewSupplier(p => ({ ...p, [k]: v }))}
+              onSave={addSupplier}
+              onCancel={() => { setShowNew(false); setNewSupplier(blankSupplier()); }}
+              saveLabel="+ Tambah Supplier"
+            />
+          </div>
+        )}
+
+        {items.length === 0 && !showNew && (
+          <p className="text-gray-400 text-xs italic text-center py-4">Belum ada supplier.</p>
+        )}
+
+        <div className="space-y-3">
+          {items.map(supplier => (
+            <div key={supplier.id} className="border border-gray-100 rounded-xl overflow-hidden">
+              {editingId === supplier.id ? (
+                <div className="p-4">
+                  <SupplierForm
+                    supplier={supplier}
+                    onChange={(k, v) => updateSupplier(supplier.id, k, v)}
+                    onSave={() => setEditingId(null)}
+                    onCancel={() => setEditingId(null)}
+                    saveLabel="✓ Selesai Edit"
+                  />
+                </div>
+              ) : (
+                <div className="p-4 hover:bg-gray-50">
+                  <div className="flex items-start justify-between mb-2">
+                    <span className="font-semibold text-gray-800 text-sm">{supplier.name}</span>
+                    <div className="flex gap-2">
+                      <button onClick={() => setEditingId(supplier.id)}
+                        className="text-xs text-blue-600 border border-blue-100 px-2 py-0.5 rounded hover:bg-blue-50">✏️ Edit</button>
+                      <button onClick={() => removeSupplier(supplier.id)}
+                        className="text-xs text-red-400 border border-red-100 px-2 py-0.5 rounded hover:bg-red-50">✕</button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-500">
+                    {supplier.address && (
+                      <div className="col-span-2">
+                        <span className="text-gray-400">Alamat: </span>
+                        {supplier.address.split('\n').map((line, i) => (
+                          <span key={i}>{i > 0 ? ', ' : ''}{line}</span>
+                        ))}
+                      </div>
+                    )}
+                    {supplier.npwp    && <div><span className="text-gray-400">NPWP: </span>{supplier.npwp}</div>}
+                    {supplier.contact && <div><span className="text-gray-400">PIC: </span>{supplier.contact}</div>}
+                    {supplier.email   && <div><span className="text-gray-400">Email: </span>{supplier.email}</div>}
+                    {supplier.phone   && <div><span className="text-gray-400">Tel: </span>{supplier.phone}</div>}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </Card>
     </div>
   );
@@ -501,7 +652,8 @@ function Suppliers() {
 function Products() {
   const { appData, reload } = useApp();
   const [items, setItems] = useState(appData?.products || []);
-  const { save, saving, saved } = useSave('products', () => items, reload);
+  const { save, saving, saved } = useSave('products', () => items, reload, appData);
+  useEffect(() => { if (appData?.products) setItems(appData.products); }, [appData]);
   return (
     <div><SaveBtn onSave={save} saving={saving} saved={saved} />
       <Card title="⛽ Data Produk">
@@ -515,7 +667,8 @@ function Facilities() {
   const { appData, reload } = useApp();
   const TYPES = ['SPOB','Kapal Tanker','Truk Tangki','Storage Tank','Lainnya'];
   const [items, setItems] = useState(appData?.facilities || []);
-  const { save, saving, saved } = useSave('facilities', () => items, reload);
+  const { save, saving, saved } = useSave('facilities', () => items, reload, appData);
+  useEffect(() => { if (appData?.facilities) setItems(appData.facilities); }, [appData]);
   const genId = () => `GPP-${String(items.length+1).padStart(3,'0')}`;
   const [row, setRow] = useState({ facilityId: genId(), name:'', type:'SPOB', capacity:'', notes:'' });
   const add = () => { if(!row.name)return; setItems(p=>[...p,{...row,id:Date.now().toString()}]); setRow(r=>({...r,facilityId:genId(),name:'',capacity:'',notes:''})); };

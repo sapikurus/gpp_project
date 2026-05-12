@@ -1,22 +1,14 @@
 {
-  "name": "FuelOps — PT Global Petro Pasifik",
-  "short_name": "FuelOps GPP",
-  "description": "Fuel trading operations system for PT Global Petro Pasifik",
+  "name": "GPP Portal — PT Global Petro Pasifik",
+  "short_name": "GPP Portal",
+  "description": "GPP Portal — trading operations system for PT Global Petro Pasifik",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f9fafb",
   "theme_color": "#1e3a8a",
   "orientation": "portrait-primary",
   "icons": [
-    {
-      "src": "/favicon.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/favicon.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
+    { "src": "/favicon.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/favicon.png", "sizes": "512x512", "type": "image/png" }
   ]
 }
