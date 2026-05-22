@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLang } from '../../utils/i18n.jsx';
 import { autoPeriod } from '../../utils/utils.js';
 import { useApp } from '../../App.jsx';
-import { fetchCollection, createNumberedDoc, CALCS_REF, CARGOS_REF } from '../../firebase.js';
+import { fetchCollection, createNumberedDoc, deleteSubDoc, CALCS_REF, CARGOS_REF } from '../../firebase.js';
 import { formatIDR, today, daysBetween } from '../../utils/utils.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -252,27 +252,34 @@ export default function Calculator() {
         {/* Cargo Position */}
         <InputCard title="Cargo Position">
           <Field label="Position">
-            {form.cargoId
-              ? <div className="bg-blue-50 rounded-lg px-3 py-2.5 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-blue-800 leading-tight">{form.cargoLabel}</p>
-                    <p className="text-xs text-blue-400 mt-0.5">{form.tranches.length} tranche · {Number(totalTrVol).toLocaleString('id-ID')} L</p>
-                  </div>
-                  <button onClick={() => setForm(p => ({ ...p, cargoId:'', cargoLabel:'', tranches:[] }))} className="text-xs text-gray-400 hover:text-red-500 ml-2">✕</button>
+            <select
+              value={form.cargoId}
+              onChange={e => {
+                if (!e.target.value) { setForm(p => ({ ...p, cargoId:'', cargoLabel:'', tranches:[] })); return; }
+                const c = cargos.find(x => x.id === e.target.value);
+                if (c) loadCargo(c);
+              }}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+            >
+              <option value="">— Select stock position —</option>
+              {cargos.map(c => {
+                const vol = (c.tranches||[]).reduce((s,t)=>s+(parseFloat(t.vol)||0),0);
+                return (
+                  <option key={c.id} value={c.id}>
+                    {c.label}{c.status ? ` [${c.status}]` : ''} · {(vol/1000).toFixed(0)}kL
+                  </option>
+                );
+              })}
+            </select>
+            {form.cargoId && (
+              <div className="mt-2 bg-blue-50 rounded-lg px-3 py-2 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-blue-800">{form.cargoLabel}</p>
+                  <p className="text-[10px] text-blue-400 mt-0.5">{form.tranches.length} tranche · {Number(totalTrVol).toLocaleString('id-ID')} L</p>
                 </div>
-              : <div className="space-y-1.5 max-h-52 overflow-y-auto">
-                  {cargos.length === 0
-                    ? <p className="text-gray-400 text-xs italic">Buat kargo dulu.</p>
-                    : cargos.map(c => (
-                        <div key={c.id} onClick={() => loadCargo(c)}
-                          className="border border-gray-100 rounded-lg px-3 py-2 hover:border-blue-300 hover:bg-blue-50 cursor-pointer transition-colors">
-                          <p className="text-xs font-medium text-gray-700 leading-tight">{c.label}</p>
-                          <p className="text-[10px] text-gray-400 mt-0.5">{c.product} · {c.tranches?.length || 0} tranche</p>
-                        </div>
-                      ))
-                  }
-                </div>
-            }
+                <button onClick={() => setForm(p=>({...p,cargoId:'',cargoLabel:'',tranches:[]}))} className="text-blue-300 hover:text-red-400 text-xs ml-2">✕ Clear</button>
+              </div>
+            )}
           </Field>
         </InputCard>
 
@@ -460,14 +467,15 @@ export default function Calculator() {
               );
             })()}
 
-            <div className="flex gap-2 mb-6">
-              <button onClick={saveSnapshot} disabled={saving}
-                className="flex-1 bg-blue-700 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-800 disabled:opacity-50">
-                {saving ? '⏳' : saved ? '✅ Saved' : t('calc_snapshot')}
+            {/* Action buttons — OL is primary, snapshot is secondary */}
+            <div className="space-y-2 mb-6">
+              <button onClick={createOfferingLetter} disabled={!pl}
+                className="w-full bg-blue-700 text-white py-3 rounded-xl text-sm font-bold hover:bg-blue-800 disabled:opacity-40 transition-colors shadow-sm">
+                📄 Create Offering Letter
               </button>
-              <button onClick={createOfferingLetter} title={t('calc_create_ol_tip')}
-                className="flex-1 bg-white border border-blue-200 text-blue-700 py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-50 transition-colors">
-                {t('btn_create_ol')}
+              <button onClick={saveSnapshot} disabled={saving || !pl}
+                className="w-full bg-white border border-gray-200 text-gray-600 py-2 rounded-xl text-xs font-semibold hover:bg-gray-50 disabled:opacity-40 transition-colors">
+                {saving ? '⏳ Saving…' : saved ? '✅ Saved' : '💾 Save as Snapshot'}
               </button>
             </div>
           </>
@@ -475,25 +483,37 @@ export default function Calculator() {
 
         {/* Saved snapshots */}
         <div className="bg-white rounded-xl shadow-sm p-5">
-          <h2 className="font-semibold text-gray-700 mb-3 text-sm">📁 Snapshot Tersimpan</h2>
+          <h2 className="font-semibold text-gray-700 mb-3 text-sm">📁 Saved Snapshots</h2>
           {loadingSnap
-            ? <p className="text-gray-400 text-sm">Memuat…</p>
+            ? <p className="text-gray-400 text-sm">Loading…</p>
             : snapshots.length === 0
-              ? <p className="text-gray-400 text-sm">Belum ada snapshot.</p>
+              ? <p className="text-gray-400 text-sm">No snapshots saved yet.</p>
               : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {snapshots.map(s => (
-                <div key={s.id} onClick={() => setForm({ ...INIT, ...s.form })}
-                  className="border border-gray-100 rounded-lg p-3 hover:border-blue-200 hover:bg-blue-50 cursor-pointer transition-colors">
-                  <p className="text-xs font-mono text-blue-600">{s.docNumber}</p>
-                  <p className="text-sm font-medium text-gray-700 mt-0.5 leading-tight">{s.label}</p>
-                  <div className="flex justify-between mt-2 text-xs text-gray-400">
-                    <span>{Number(s.pl?.totalVol || 0).toLocaleString('id-ID')} L</span>
-                    <span className={`font-semibold ${(s.pl?.totalMargin || 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                      {fmt2(s.pl?.totalMargin || 0)}/L
-                    </span>
+                <div key={s.id} className="border border-gray-100 rounded-lg p-3 hover:border-blue-200 hover:bg-blue-50 transition-colors group relative">
+                  {/* Delete button */}
+                  <button
+                    onClick={async e => {
+                      e.stopPropagation();
+                      if (!confirm('Delete this snapshot?')) return;
+                      await deleteSubDoc(CALCS_REF(), s.id);
+                      setSnapshots(prev => prev.filter(x => x.id !== s.id));
+                    }}
+                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-[10px] text-red-400 hover:text-red-600 transition-opacity bg-white rounded px-1.5 py-0.5 border border-red-100"
+                  >✕ Del</button>
+                  {/* Load on click */}
+                  <div onClick={() => setForm({ ...INIT, ...s.form })} className="cursor-pointer">
+                    <p className="text-xs font-mono text-blue-600">{s.docNumber}</p>
+                    <p className="text-sm font-medium text-gray-700 mt-0.5 leading-tight">{s.label}</p>
+                    <div className="flex justify-between mt-2 text-xs text-gray-400">
+                      <span>{Number(s.pl?.totalVol || 0).toLocaleString('id-ID')} L</span>
+                      <span className={`font-semibold ${(s.pl?.totalMargin || 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                        {fmt2(s.pl?.totalMargin || 0)}/L
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-gray-300 mt-1">{new Date(s.createdAt).toLocaleDateString('id-ID')}</p>
                   </div>
-                  <p className="text-[10px] text-gray-300 mt-1">{new Date(s.createdAt).toLocaleDateString('id-ID')}</p>
                 </div>
               ))}
             </div>
