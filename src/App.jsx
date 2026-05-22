@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { ensureInit, fetchData, onAuth, getUserRole } from './firebase.js';
+import { ensureInit, fetchData, onAuth } from './firebase.js';
+import { getLang, setLang as saveLang, t as translate } from './i18n.js';
 
 import Login          from './components/Auth/Login.jsx';
 import Sidebar        from './components/Layout/Sidebar.jsx';
@@ -18,11 +19,18 @@ export const AppCtx = createContext(null);
 export const useApp = () => useContext(AppCtx);
 
 export default function App() {
-  const [user,     setUser]     = useState(undefined);
-  const [userRole, setUserRole] = useState('staff');
-  const [appData,  setAppData]  = useState(null);
-  const [loading,  setLoading]  = useState(true);
-  const [error,    setError]    = useState(null);
+  const [user,      setUser]      = useState(undefined);
+  const [userRole,  setUserRole]  = useState('staff');
+  const [appData,   setAppData]   = useState(null);
+  const [loading,   setLoading]   = useState(true);
+  const [error,     setError]     = useState(null);
+  const [lang,      setLangState] = useState(getLang());
+
+  const toggleLang = () => {
+    const next = lang === 'en' ? 'id' : 'en';
+    saveLang(next); setLangState(next);
+  };
+  const t = (key) => translate(lang, key);
 
   useEffect(() => {
     const unsub = onAuth(async (u) => {
@@ -32,7 +40,6 @@ export default function App() {
           await ensureInit();
           const data = await fetchData();
           setAppData(data);
-          // Load role from userRoles map
           const role = (data?.userRoles || {})[u.email] || 'staff';
           setUserRole(role);
         } catch (e) { setError(e.message); }
@@ -62,7 +69,7 @@ export default function App() {
   if (error) return (
     <div className="flex items-center justify-center h-screen bg-gray-50">
       <div className="bg-white rounded-xl shadow p-8 max-w-md text-center">
-        <p className="text-red-600 font-semibold mb-2">Koneksi Firebase Gagal</p>
+        <p className="text-red-600 font-semibold mb-2">Firebase Connection Failed</p>
         <p className="text-gray-500 text-sm">{error}</p>
       </div>
     </div>
@@ -72,13 +79,13 @@ export default function App() {
     <div className="flex items-center justify-center h-screen bg-gray-50">
       <div className="text-center">
         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700 mx-auto mb-3" />
-        <p className="text-gray-500 text-sm">Memuat data…</p>
+        <p className="text-gray-500 text-sm">Loading…</p>
       </div>
     </div>
   );
 
   return (
-    <AppCtx.Provider value={{ appData, reload, user, userRole }}>
+    <AppCtx.Provider value={{ appData, reload, user, userRole, lang, toggleLang, t }}>
       <div className="flex h-screen bg-gray-50 overflow-hidden">
         <Sidebar />
         <main className="flex-1 overflow-y-auto">
@@ -92,7 +99,7 @@ export default function App() {
             <Route path="/delivery-order"  element={<DeliveryOrder />} />
             <Route path="/mops"            element={<MopsData />} />
             <Route path="/master-data/*"   element={<MasterData />} />
-            <Route path="*"               element={<Navigate to="/" replace />} />
+            <Route path="*"                element={<Navigate to="/" replace />} />
           </Routes>
         </main>
       </div>

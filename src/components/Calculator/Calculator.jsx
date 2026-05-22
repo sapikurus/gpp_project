@@ -1,4 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useLang } from '../../utils/i18n.jsx';
+import { autoPeriod } from '../../utils/utils.js';
 import { useApp } from '../../App.jsx';
 import { fetchCollection, createNumberedDoc, CALCS_REF, CARGOS_REF } from '../../firebase.js';
 import { formatIDR, today, daysBetween } from '../../utils/utils.js';
@@ -125,6 +128,8 @@ const INIT = {
 
 export default function Calculator() {
   const { appData } = useApp();
+  const nav = useNavigate();
+  const { t } = useLang();
   const rates         = appData?.rates          || {};
   const pbbkbProvinces = appData?.pbbkbProvinces || [];
   const bankRate      = n(rates.bankRate) / 100;
@@ -223,6 +228,17 @@ export default function Calculator() {
       const fresh = await fetchCollection(CALCS_REF()); setSnapshots(fresh);
       setSaved(true); setTimeout(() => setSaved(false), 2500);
     } finally { setSaving(false); }
+  };
+
+  // Pass current calculation to Offering Letter
+  const createOfferingLetter = () => {
+    if (!pl) return;
+    sessionStorage.setItem('calcToOL', JSON.stringify({
+      dpp:     pl.sellPrice,
+      product: form.cargoLabel || '',
+      period:  autoPeriod(),
+    }));
+    nav('/offering-letter');
   };
 
   const totalTrVol = form.tranches.reduce((s, t) => s + (n(t.vol)), 0);
@@ -444,10 +460,16 @@ export default function Calculator() {
               );
             })()}
 
-            <button onClick={saveSnapshot} disabled={saving}
-              className="w-full bg-blue-700 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-800 disabled:opacity-50 mb-6">
-              {saving ? '⏳ Menyimpan…' : saved ? '✅ Snapshot Tersimpan' : '💾 Simpan Snapshot'}
-            </button>
+            <div className="flex gap-2 mb-6">
+              <button onClick={saveSnapshot} disabled={saving}
+                className="flex-1 bg-blue-700 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-800 disabled:opacity-50">
+                {saving ? '⏳' : saved ? '✅ Saved' : t('calc_snapshot')}
+              </button>
+              <button onClick={createOfferingLetter} title={t('calc_create_ol_tip')}
+                className="flex-1 bg-white border border-blue-200 text-blue-700 py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-50 transition-colors">
+                {t('btn_create_ol')}
+              </button>
+            </div>
           </>
         )}
 

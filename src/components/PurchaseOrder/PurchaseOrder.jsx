@@ -3,6 +3,7 @@ import { useApp } from '../../App.jsx';
 import { fetchCollection, createNumberedDoc, updateSubDoc, deleteSubDoc, POS_REF } from '../../firebase.js';
 import { formatIDR, formatDateID, buildPONumber, today, terbilang } from '../../utils/utils.js';
 import { getChain, firstPending, nextStatus, isEditable, isApproved, statusMeta, canDelete } from '../../utils/approvalUtils.js';
+import { useLang } from '../../utils/i18n.jsx';
 import ApprovalPanel, { StatusBadge, DraftWatermark } from '../Layout/ApprovalPanel.jsx';
 import PrintWrapper from '../Layout/PrintWrapper.jsx';
 import logo from '../../assets/gpp-logo.png';
@@ -28,6 +29,7 @@ export default function PurchaseOrder() {
   const rates = appData?.rates || {};
   const co = appData?.headOffice || appData?.company || {};
   const chain = getChain(appData?.settings, 'po');
+  const { t } = useLang();
 
   useEffect(() => { fetchCollection(POS_REF()).then(p => { setPOs(p); setLoading(false); }); }, []);
 
@@ -60,7 +62,7 @@ export default function PurchaseOrder() {
   };
 
   const remove = async (id) => {
-    if (!canDelete(userRole) || !confirm('Hapus PO ini?')) return;
+    if (!canDelete(userRole) || !confirm('Delete this PO?')) return;
     await deleteSubDoc(POS_REF(), id); setPOs(p => p.filter(x => x.id !== id));
   };
 
@@ -86,11 +88,11 @@ export default function PurchaseOrder() {
     <div className="flex flex-col h-full bg-gray-50 overflow-hidden pt-14 md:pt-0">
       <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <button onClick={cancelForm} className="text-gray-400 hover:text-gray-600 text-sm">← Kembali</button>
+          <button onClick={cancelForm} className="text-gray-400 hover:text-gray-600 text-sm">← Back</button>
           <span className="text-gray-300">|</span>
-          <h1 className="text-base font-bold text-gray-800">{editingId?'Edit Purchase Order':'Purchase Order Baru'}</h1>
+          <h1 className="text-base font-bold text-gray-800">{editingId ? 'Edit Purchase Order' : 'New Purchase Order'}</h1>
         </div>
-        <button onClick={save} disabled={saving||!form.vendorName} className="bg-blue-700 text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-50">{saving?'⏳':editingId?'💾 Simpan':'+ Buat PO'}</button>
+        <button onClick={save} disabled={saving||!form.vendorName} className="bg-blue-700 text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-50">{saving?'⏳ Saving…':editingId?'💾 Save':'+ Create PO'}</button>
       </div>
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-5xl mx-auto p-4 md:p-6">
@@ -108,7 +110,7 @@ export default function PurchaseOrder() {
                       {suppliers.map((s,i)=><option key={i} value={s.name}>{s.name}</option>)}
                     </select>
                   </div>
-                  {[['vendorName','Nama Vendor'],['vendorNPWP','NPWP Vendor']].map(([k,l])=>(<div key={k}><label className="block text-xs text-gray-500 mb-1">{l}</label><input type="text" value={form[k]||''} onChange={e=>set(k)(e.target.value)} className={IF}/></div>))}
+                  {[['vendorName','Vendor Name'],['vendorNPWP','Vendor NPWP']].map(([k,l])=>(<div key={k}><label className="block text-xs text-gray-500 mb-1">{l}</label><input type="text" value={form[k]||''} onChange={e=>set(k)(e.target.value)} className={IF}/></div>))}
                   <div className="col-span-2"><label className="block text-xs text-gray-500 mb-1">Alamat Vendor</label><input type="text" value={form.vendorAddr||''} onChange={e=>set('vendorAddr')(e.target.value)} className={IF}/></div>
                 </div>
               </div>
@@ -119,7 +121,7 @@ export default function PurchaseOrder() {
                     <div key={item.id||i} className="border border-gray-100 rounded-lg p-3 bg-gray-50 relative">
                       <div className="grid grid-cols-2 gap-2">
                         <div className="col-span-2"><label className="block text-xs text-gray-400 mb-1">Deskripsi</label><input type="text" value={item.description} onChange={e=>setItem(i,'description',e.target.value)} className={IF}/></div>
-                        {[['qty','Qty','number'],['unit','Satuan','text'],['unitPrice','Harga Satuan (IDR)','number'],['discount','Discount (IDR)','number']].map(([k,l,t])=>(<div key={k}><label className="block text-xs text-gray-400 mb-1">{l}</label><input type={t} value={item[k]||''} onChange={e=>setItem(i,k,e.target.value)} className={IF}/></div>))}
+                        {[['qty','Qty','number'],['unit','Satuan','text'],['unitPrice','Unit Price (IDR)','number'],['discount','Discount (IDR)','number']].map(([k,l,t])=>(<div key={k}><label className="block text-xs text-gray-400 mb-1">{l}</label><input type={t} value={item[k]||''} onChange={e=>setItem(i,k,e.target.value)} className={IF}/></div>))}
                         <div><label className="block text-xs text-gray-400 mb-1">Subtotal</label><p className="px-3 py-2 text-sm font-mono text-blue-700">{formatIDR(itemTotals[i]||0)}</p></div>
                       </div>
                       {form.items.length>1&&<button onClick={()=>delItem(i)} className="absolute top-2 right-2 text-red-400 text-xs">✕</button>}
@@ -144,7 +146,7 @@ export default function PurchaseOrder() {
                       <span className="text-sm text-gray-700 flex-1">PBBKB</span>
                       {form.applyPBBKB&&<span className="font-mono text-xs text-orange-500">{formatIDR(pbbkbAmt)}</span>}
                     </label>
-                    {form.applyPBBKB&&(<select value={form.pbbkbProvince} onChange={e=>set('pbbkbProvince')(e.target.value)} className={IF+' ml-7'}><option value="">— Pilih Provinsi —</option>{pbbkbProvinces.map((p,i)=><option key={i} value={p.name}>{p.name} ({p.rate}%)</option>)}</select>)}
+                    {form.applyPBBKB&&(<select value={form.pbbkbProvince} onChange={e=>set('pbbkbProvince')(e.target.value)} className={IF+' ml-7'}><option value="">— Select Province —</option>{pbbkbProvinces.map((p,i)=><option key={i} value={p.name}>{p.name} ({p.rate}%)</option>)}</select>)}
                   </div>
                 </div>
                 <div className="mt-4"><label className="block text-xs text-gray-500 mb-1">Catatan</label><textarea value={form.notes||''} onChange={e=>set('notes')(e.target.value)} rows={2} className={IF+' resize-none'}/></div>
@@ -169,15 +171,21 @@ export default function PurchaseOrder() {
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto pt-14 md:pt-6">
       {ApprovalModal}
-      <div className="flex items-center justify-between mb-6">
-        <div><h1 className="text-2xl font-bold text-gray-800">Purchase Order</h1><p className="text-xs text-gray-400 mt-0.5">Daftar PO pembelian ke supplier</p></div>
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Purchase Order</h1>
+          <p className="text-xs text-gray-400 mt-0.5">Procurement from Supplier — cargo addition &amp; fuel procurement</p>
+        </div>
         <button onClick={openNew} className="bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800">+ New Entry</button>
+      </div>
+      <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-5 text-xs text-blue-700">
+        <span className="font-semibold">📋 Purchase Order (PO)</span> is issued to a <strong>supplier</strong> when GPP buys fuel to add to stock/cargo. After approval, link the PO to its stock tranche to confirm inventory.
       </div>
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         {loading?<p className="p-8 text-gray-400 text-sm">Memuat…</p>:pos.length===0?(
           <div className="text-center py-16 text-gray-400">
-            <p className="text-3xl mb-2">📋</p><p className="text-sm">Belum ada Purchase Order.</p>
-            <button onClick={openNew} className="mt-3 text-xs text-blue-600 hover:underline">+ Buat PO Baru</button>
+            <p className="text-3xl mb-2">📋</p><p className="text-sm">No purchase orders yet.</p>
+            <button onClick={openNew} className="mt-3 text-xs text-blue-600 hover:underline">+ Create First PO</button>
           </div>
         ):(
           <div className="overflow-x-auto">

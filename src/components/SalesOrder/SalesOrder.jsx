@@ -39,7 +39,7 @@ export default function SalesOrder() {
   const [form, setForm] = useState(INIT);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [filterStatus, setFilterStatus] = useState('Semua');
+  const [filterStatus, setFilterStatus] = useState('All');
 
   const clients = appData?.clients || [];
   const pbbkbProvinces = appData?.pbbkbProvinces || [];
@@ -93,7 +93,7 @@ export default function SalesOrder() {
   };
 
   const remove = async (id) => {
-    if (!canDelete(userRole) || !confirm('Hapus SO ini?')) return;
+    if (!canDelete(userRole) || !confirm('Delete this SO?')) return;
     await deleteSubDoc(SOS_REF(), id);
     setSOs(s => s.filter(x => x.id !== id));
   };
@@ -141,8 +141,8 @@ export default function SalesOrder() {
     } finally { setSaving(false); }
   };
 
-  const filtered = filterStatus === 'Semua' ? sos : sos.filter(s => s.approvalStatus === filterStatus);
-  const statuses = ['Semua', 'draft', 'pending_manager', 'pending_director', 'approved', 'rejected'];
+  const filtered = filterStatus === 'All' ? sos : sos.filter(s => s.approvalStatus === filterStatus);
+  const statuses = ['All', 'draft', 'pending_manager', 'pending_director', 'approved', 'rejected'];
 
   const provData = pbbkbProvinces.find(p => p.name === form.deliveryProvince);
 
@@ -155,9 +155,15 @@ export default function SalesOrder() {
         </PrintWrapper>
       )}
 
-      <div className="flex items-center justify-between mb-6">
-        <div><h1 className="text-2xl font-bold text-gray-800">Sales Order</h1><p className="text-gray-500 text-sm mt-1">SO penjualan ke client</p></div>
-        <button onClick={openNew} className="bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800">+ SO Baru</button>
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Sales Order</h1>
+          <p className="text-xs text-gray-400 mt-0.5">Sales to Customer — delivery commitment to the buyer</p>
+        </div>
+        <button onClick={openNew} className="bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800">+ New SO</button>
+      </div>
+      <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-3 mb-5 text-xs text-green-800">
+        <span className="font-semibold">🤝 Sales Order (SO)</span> is issued to a <strong>client (buyer)</strong> to confirm a fuel sale. It draws volume from a Confirmed Stock position. Stock is deducted automatically when the SO receives final approval.
       </div>
 
       {/* Filter */}
@@ -165,8 +171,8 @@ export default function SalesOrder() {
         {statuses.map(s => (
           <button key={s} onClick={() => setFilterStatus(s)}
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${filterStatus === s ? 'bg-blue-700 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300'}`}>
-            {s === 'Semua' ? 'Semua' : statusMeta(s).label}
-            {s !== 'Semua' && ` (${sos.filter(x => x.approvalStatus === s).length})`}
+            {s === 'All' ? 'All' : statusMeta(s).label}
+            {s !== 'All' && ` (${sos.filter(x => x.approvalStatus === s).length})`}
           </button>
         ))}
       </div>
@@ -174,7 +180,7 @@ export default function SalesOrder() {
       {/* List */}
       {loading ? <p className="text-gray-400 text-sm">Memuat…</p> : filtered.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-          <p className="text-4xl mb-3">🤝</p><p className="text-gray-500">Belum ada Sales Order.</p>
+          <p className="text-4xl mb-3">🤝</p><p className="text-gray-500">No sales orders yet.</p>
           <button onClick={openNew} className="mt-4 bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">+ SO Baru</button>
         </div>
       ) : (
@@ -223,7 +229,7 @@ export default function SalesOrder() {
             </div>
             <div className="p-5 space-y-4">
               <div className="bg-gray-50 rounded-xl p-4 grid grid-cols-2 gap-3 text-sm">
-                {[['Produk', so.product||'-'],['Volume', so.volume ? Number(so.volume).toLocaleString('id-ID')+' L' : '-'],
+                {[['Product', so.product||'-'],['Volume', so.volume ? Number(so.volume).toLocaleString('id-ID')+' L' : '-'],
                   ['Harga', so.agreedPrice ? formatIDR(so.agreedPrice)+'/L' : '-'],['Terms', `${so.paymentTerms} ${so.clientTOP ? `(${so.clientTOP}d)` : ''}`],
                   ['Lokasi', so.deliveryLocation||'-'],['Provinsi', so.deliveryProvince||'-']
                 ].map(([k,v]) => (
@@ -269,7 +275,7 @@ export default function SalesOrder() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b sticky top-0 bg-white z-10">
-              <h2 className="font-bold text-gray-800 text-lg">{editing ? 'Edit SO' : 'Sales Order Baru'}</h2>
+              <h2 className="font-bold text-gray-800 text-lg">{editing ? 'Edit Sales Order' : 'New Sales Order'}</h2>
               <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
             </div>
             <div className="p-5 space-y-4">
@@ -329,7 +335,7 @@ export default function SalesOrder() {
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"/>
                 </div>
 
-                {[['product','Produk'],['volume','Volume (Liter)'],['agreedPrice','Harga Disepakati (IDR/L)'],['deliveryLocation','Lokasi Pengiriman']].map(([k,l])=>(
+                {[['product','Product'],['volume','Volume (Litres)'],['agreedPrice','Agreed Price (IDR/L)'],['deliveryLocation','Delivery Location']].map(([k,l])=>(
                   <div key={k}><label className="block text-xs text-gray-500 mb-1">{l}</label>
                     <input type={['volume','agreedPrice'].includes(k)?'number':'text'} value={form[k]||''} onChange={e=>set(k)(e.target.value)}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"/></div>
@@ -362,7 +368,7 @@ export default function SalesOrder() {
             <div className="flex gap-3 p-5 border-t sticky bottom-0 bg-white">
               <button onClick={save} disabled={saving||!form.clientName||!form.stockId}
                 className="flex-1 bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-50">
-                {saving?'⏳':editing?'💾 Simpan':'+ Buat SO'}
+                {saving?'⏳ Saving…':editing?'💾 Save':'+ Create SO'}
               </button>
               <button onClick={()=>setShowForm(false)} className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-600">Batal</button>
             </div>
@@ -396,7 +402,7 @@ function SOPrint({ data, company, rates }) {
         <div><p className="font-bold text-gray-400 uppercase mb-1">Pengiriman</p><p>{data.deliveryLocation||'-'}</p>{data.deliveryProvince&&<p className="text-gray-500">Provinsi: {data.deliveryProvince}</p>}</div>
       </div>
       <table className="w-full mb-5 border-collapse text-xs">
-        <thead><tr className="bg-blue-900 text-white">{['Produk','Volume','Satuan','Harga/L','Jumlah'].map(h=><th key={h} className="border border-blue-700 px-3 py-2 text-left">{h}</th>)}</tr></thead>
+        <thead><tr className="bg-blue-900 text-white">{['Product','Volume','Satuan','Harga/L','Jumlah'].map(h=><th key={h} className="border border-blue-700 px-3 py-2 text-left">{h}</th>)}</tr></thead>
         <tbody><tr className="bg-white"><td className="border border-gray-200 px-3 py-2">{data.product}</td><td className="border border-gray-200 px-3 py-2 text-right">{Number(vol).toLocaleString('id-ID')}</td><td className="border border-gray-200 px-3 py-2">Liter</td><td className="border border-gray-200 px-3 py-2 text-right">{new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:2}).format(price)}</td><td className="border border-gray-200 px-3 py-2 text-right font-semibold">{new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(subtotal)}</td></tr></tbody>
         <tfoot>
           <tr><td colSpan={4} className="border border-gray-200 px-3 py-1.5 text-right font-semibold">PPN {rates?.ppn||11}%</td><td className="border border-gray-200 px-3 py-1.5 text-right">{new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(ppn)}</td></tr>

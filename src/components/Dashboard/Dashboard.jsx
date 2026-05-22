@@ -4,6 +4,7 @@ import { useApp } from '../../App.jsx';
 import { fetchCollection, POS_REF, DOS_REF, STOCKS_REF, SOS_REF, OLS_REF } from '../../firebase.js';
 import { formatIDR } from '../../utils/utils.js';
 import { statusMeta, canApprove, getChain } from '../../utils/approvalUtils.js';
+import { useLang } from '../../utils/i18n.jsx';
 
 const StatCard = ({ label, value, sub, color='blue', onClick, badge }) => (
   <div onClick={onClick} className={`bg-white rounded-xl shadow-sm p-4 border-l-4 border-${color}-500 ${onClick?'cursor-pointer hover:shadow-md transition-shadow':''}`}>
@@ -16,12 +17,13 @@ const StatCard = ({ label, value, sub, color='blue', onClick, badge }) => (
   </div>
 );
 
-const TYPE_LABELS = { po: 'Purchase Order', so: 'Sales Order', ol: 'Surat Penawaran' };
 const TYPE_COLORS = { po: 'purple', so: 'blue', ol: 'amber' };
 const TYPE_ROUTES = { po: '/purchase-order', so: '/sales-order', ol: '/offering-letter' };
 
 export default function Dashboard() {
   const { appData, userRole } = useApp();
+  const { t } = useLang();
+  const TYPE_LABELS = { po: 'Purchase Order', so: 'Sales Order', ol: t('nav_offering_letter') };
   const nav = useNavigate();
   const [pos,    setPOs]    = useState([]);
   const [dos,    setDOs]    = useState([]);
@@ -65,7 +67,7 @@ export default function Dashboard() {
     <div className="p-4 md:p-6 max-w-6xl mx-auto pt-14 md:pt-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
-        <p className="text-gray-500 text-sm mt-1">PT Global Petro Pasifik</p>
+        <p className="text-gray-500 text-sm mt-1">{t('desc_dashboard')}</p>
       </div>
 
       {/* ── Pending Approval Tasks ── */}
@@ -74,7 +76,7 @@ export default function Dashboard() {
           <div className="flex items-center justify-between px-5 py-3 bg-amber-50 border-b border-amber-100">
             <div className="flex items-center gap-2">
               <span className="text-lg">⏳</span>
-              <p className="font-semibold text-amber-800">Tugas Menunggu Persetujuan Anda</p>
+              <p className="font-semibold text-amber-800">{t('dash_pending_title')}</p>
               <span className="bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{pendingItems.length}</span>
             </div>
           </div>
@@ -99,7 +101,7 @@ export default function Dashboard() {
                     {item.amount && <span className="text-xs text-gray-400 font-mono">{item.amount}</span>}
                     <button onClick={() => nav(TYPE_ROUTES[item.type])}
                       className="text-xs bg-blue-700 text-white px-3 py-1.5 rounded-lg hover:bg-blue-800 font-semibold whitespace-nowrap">
-                      Buka →
+                      {t('dash_open')}
                     </button>
                   </div>
                 </div>
@@ -110,32 +112,32 @@ export default function Dashboard() {
       ) : !loading && (
         <div className="bg-green-50 border border-green-200 rounded-xl px-5 py-3 mb-6 flex items-center gap-3">
           <span className="text-lg">✅</span>
-          <p className="text-green-700 text-sm font-medium">Tidak ada tugas tertunggak — semua dokumen telah diproses.</p>
+          <p className="text-green-700 text-sm font-medium">{t('dash_no_pending')}</p>
         </div>
       )}
 
       {/* ── Stat cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Stok Tersedia" value={loading?'…':Number(totalAvailable).toLocaleString('id-ID')+' L'}
-          sub={`${confirmedStocks.length} stok confirmed`} color="blue" onClick={() => nav('/stok')} />
-        <StatCard label="Terikat SO" value={loading?'…':Number(totalCommitted).toLocaleString('id-ID')+' L'}
-          sub={`${approvedSOs.length} SO disetujui`} color="orange" onClick={() => nav('/sales-order')} />
-        <StatCard label="Total PO" value={loading?'…':pos.length}
+        <StatCard label="{t('dash_available_stock')}" value={loading?'…':Number(totalAvailable).toLocaleString('id-ID')+' L'}
+          sub={`${confirmedStocks.length} confirmed`} color="blue" onClick={() => nav('/stok')} />
+        <StatCard label="{t('dash_committed_so')}" value={loading?'…':Number(totalCommitted).toLocaleString('id-ID')+' L'}
+          sub={`${approvedSOs.length} SO approved`} color="orange" onClick={() => nav('/sales-order')} />
+        <StatCard label="{t('dash_total_po')}" value={loading?'…':pos.length}
           sub={formatIDR(totalPOValue)} color="purple" onClick={() => nav('/purchase-order')}
           badge={pendingItems.filter(p=>p.type==='po').length || null} />
-        <StatCard label="Delivery Orders" value={loading?'…':dos.length}
-          sub="Surat Jalan + BDR" color="green" onClick={() => nav('/delivery-order')} />
+        <StatCard label="{t('dash_delivery')}" value={loading?'…':dos.length}
+          sub="DO + BDR" color="green" onClick={() => nav('/delivery-order')} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Confirmed stocks */}
         <div className="bg-white rounded-xl shadow-sm p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-gray-700">Stok Confirmed</h2>
-            <button onClick={() => nav('/stok')} className="text-blue-600 text-xs hover:underline">Lihat Semua →</button>
+            <h2 className="font-semibold text-gray-700">{t('dash_confirmed_stock')}</h2>
+            <button onClick={() => nav('/stok')} className="text-blue-600 text-xs hover:underline">{t('dash_view_all')}</button>
           </div>
-          {loading ? <p className="text-gray-400 text-sm">Memuat…</p> :
-           confirmedStocks.length === 0 ? <p className="text-gray-400 text-sm">Belum ada stok confirmed.</p> : (
+          {loading ? <p className="text-gray-400 text-sm">Loading…</p> :
+           confirmedStocks.length === 0 ? <p className="text-gray-400 text-sm">{t('dash_no_stock')}</p> : (
             <div className="space-y-3">
               {confirmedStocks.slice(0,4).map(s => {
                 const avail = Math.max(0,(s.totalVolume||0)-(s.committedVolume||0));
@@ -149,7 +151,7 @@ export default function Dashboard() {
                     <div className="w-full bg-gray-100 rounded-full h-1.5">
                       <div className="bg-blue-500 h-1.5 rounded-full" style={{width:`${pct}%`}}/>
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5">{Number(s.totalVolume||0).toLocaleString('id-ID')} L total · {pct.toFixed(0)}% terikat</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{Number(s.totalVolume||0).toLocaleString('id-ID')} L total · {pct.toFixed(0)}% committed</p>
                   </div>
                 );
               })}
@@ -160,11 +162,11 @@ export default function Dashboard() {
         {/* Recent SO */}
         <div className="bg-white rounded-xl shadow-sm p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-gray-700">Sales Order Terbaru</h2>
-            <button onClick={() => nav('/sales-order')} className="text-blue-600 text-xs hover:underline">Lihat Semua →</button>
+            <h2 className="font-semibold text-gray-700">{t('dash_recent_so')}</h2>
+            <button onClick={() => nav('/sales-order')} className="text-blue-600 text-xs hover:underline">{t('dash_view_all')}</button>
           </div>
-          {loading ? <p className="text-gray-400 text-sm">Memuat…</p> :
-           sos.length === 0 ? <p className="text-gray-400 text-sm">Belum ada SO.</p> : (
+          {loading ? <p className="text-gray-400 text-sm">Loading…</p> :
+           sos.length === 0 ? <p className="text-gray-400 text-sm">{t('dash_no_so')}</p> : (
             <div className="space-y-2">
               {sos.slice(0,5).map(s => {
                 const m = statusMeta(s.approvalStatus);

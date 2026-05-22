@@ -93,7 +93,14 @@ export default function OfferingLetter() {
   const nextSeq  = (appData?.counters?.ol || 0) + 1;
 
   useEffect(() => {
-    fetchCollection(OLS_REF()).then(l => { setLetters(l); setLoading(false); });
+    fetchCollection(OLS_REF()).then(l => {
+      setLetters(l);
+      setLoading(false);
+      // Auto-open new letter form if arriving from Calculator
+      if (sessionStorage.getItem('calcToOL')) {
+        setTimeout(() => openNew(), 50);
+      }
+    });
   }, []);
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -135,7 +142,17 @@ export default function OfferingLetter() {
 
   // ── Open form ─────────────────────────────────────────────────────────────────
   const openNew = () => {
-    setForm(INIT(nextSeq));
+    const base = INIT(nextSeq);
+    const calcPrefill = sessionStorage.getItem('calcToOL');
+    if (calcPrefill) {
+      try {
+        const { dpp, product, period } = JSON.parse(calcPrefill);
+        sessionStorage.removeItem('calcToOL');
+        setForm({ ...base, dpp: dpp||'', product: product||'', period: period||base.period });
+      } catch { setForm(base); }
+    } else {
+      setForm(base);
+    }
     setEditingId(null);
     setView('form');
   };
