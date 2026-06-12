@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { useApp } from '../../App.jsx';
 import { patchField, patchData, exportBackup, importBackup } from '../../firebase.js';
+import * as XLSX from 'xlsx';
 
 const F = ({ label, value, onChange, type = 'text', placeholder = '', step }) => (
   <div>
@@ -497,20 +498,73 @@ function Clients() {
     </Card>
   );
 
+  // ── Template download ──
+  const downloadTemplate = () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['Nama Perusahaan *', 'Kode Client', 'NPWP', 'Alamat Baris 1', 'Alamat Baris 2', 'Alamat Baris 3', 'Kontak / PIC', 'Email', 'TOP Default (hari)'],
+      ['PT. Contoh Tbk.', 'CTOH', '00.000.000.0-000.000', 'Gedung Contoh, lt 5', 'Jl. Jendral Sudirman No. 1', 'Jakarta Pusat 10220', 'Budi Santoso', 'budi@contoh.co.id', '45'],
+    ]);
+    ws['!cols'] = [30,16,22,28,28,22,20,26,10].map(w=>({wch:w}));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Clients');
+    XLSX.writeFile(wb, 'GPP_Client_Template.xlsx');
+  };
+
+  // ── Excel import ──
+  const importExcel = async (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    try {
+      const ab   = await file.arrayBuffer();
+      const wb   = XLSX.read(ab);
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+      if (rows.length < 2) { alert('No data rows found.'); return; }
+      // Skip header row (row 0)
+      const imported = rows.slice(1).filter(r => r[0]).map(r => ({
+        id:          Date.now().toString() + Math.random(),
+        name:        String(r[0] || '').trim(),
+        code:        String(r[1] || '').trim().toUpperCase(),
+        npwp:        String(r[2] || '').trim(),
+        address:     [r[3],r[4],r[5]].map(v=>String(v||'').trim()).filter(Boolean).join('\n'),
+        contact:     String(r[6] || '').trim(),
+        email:       String(r[7] || '').trim(),
+        top:         String(r[8] || '').trim(),
+        addressRows: [r[3],r[4],r[5]].filter(v=>String(v||'').trim()).length || 1,
+      }));
+      if (imported.length === 0) { alert('No valid rows found.'); return; }
+      if (!confirm(`Import ${imported.length} clients? Existing clients will be kept.`)) return;
+      const merged = [...items, ...imported.filter(imp => !items.find(ex => ex.name === imp.name))];
+      await patchField('clients', merged);
+      await reload();
+      alert(`✅ Imported ${imported.length} clients.`);
+    } catch(err) { alert('Import failed: ' + err.message); }
+    e.target.value = '';
+  };
+
   // ── List view ──
   return (
     <Card title="👥 Client Database"
       action={
-        <button onClick={openNew}
-          className="bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-800">
-          + New Entry
-        </button>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <button onClick={downloadTemplate}
+            className="text-xs bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-100 font-medium">
+            ⬇ Template
+          </button>
+          <label className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-100 font-medium cursor-pointer">
+            📥 Import Excel
+            <input type="file" accept=".xlsx,.xls,.csv" onChange={importExcel} className="hidden"/>
+          </label>
+          <button onClick={openNew}
+            className="bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-800">
+            + New Entry
+          </button>
+        </div>
       }>
       <p className="text-xs text-gray-400 mb-4">
-        Kode client digunakan dalam nomor surat. Klik entry untuk edit. Data disimpan langsung ke Firestore.
+        Kode client digunakan dalam nomor surat. Download template Excel, isi, lalu import. Data disimpan langsung ke Firestore.
       </p>
       {items.length === 0
-        ? <p className="text-gray-400 text-xs italic text-center py-6">Belum ada client. Klik "+ New Entry" untuk menambahkan.</p>
+        ? <p className="text-gray-400 text-xs italic text-center py-6">Belum ada client. Klik "+ New Entry" atau import dari Excel.</p>
         : <div className="space-y-2">
             {items.map(client => (
               <div key={client.id} className="border border-gray-100 rounded-xl p-4 hover:bg-gray-50 hover:border-blue-100 transition-colors">

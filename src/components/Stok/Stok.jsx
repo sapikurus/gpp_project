@@ -5,7 +5,7 @@ import {
   fetchCollection, createNumberedDoc, updateSubDoc, deleteSubDoc,
   STOCKS_REF, POS_REF,
 } from '../../firebase.js';
-import { today, formatIDR, formatDateShort } from '../../utils/utils.js';
+import { today, formatIDR, formatDateShort, daysBetween, INDO_MONTHS } from '../../utils/utils.js';
 import { canDelete } from '../../utils/approvalUtils.js';
 
 // ─── Calculation helpers ──────────────────────────────────────────────────────
@@ -340,6 +340,7 @@ export default function Stok() {
   const [trancheModal, setTrancheModal] = useState(null); // null | tranche obj (blank = add, filled = edit)
   const [savingTranche, setSavingTranche] = useState(false);
   const [showLinkPO, setShowLinkPO] = useState(false);
+  const [showEndCycle, setShowEndCycle] = useState(false);
 
   const rates = appData?.rates || {};
   const provs = appData?.pbbkbProvinces || [];
@@ -442,6 +443,34 @@ export default function Stok() {
           onClose={() => setTrancheModal(null)}
         />
       )}
+      {/* ── End Cycle Modal ── */}
+      {showEndCycle && selected && (
+        <EndCycleModal
+          stock={selected}
+          tranches={selected.tranches || []}
+          rates={rates}
+          provs={provs}
+          onClose={() => setShowEndCycle(false)}
+          onConfirm={async (rollover) => {
+            await updateSubDoc(STOCKS_REF(), selected.id, {
+              tranches: [rollover],
+              totalVolume: parseFloat(rollover.vol) || 0,
+              committedVolume: 0,
+              status: 'Confirmed',
+              cycleRollovers: [...(selected.cycleRollovers || []), {
+                date: rollover.cycleDate,
+                prevBlendedModal: rollover.prevBlendedModal,
+                prevCoM: rollover.prevCoM,
+                prevTranchesCount: selected.tranches?.length || 0,
+                at: Date.now(),
+              }],
+            });
+            setStocks(await fetchCollection(STOCKS_REF()));
+            setShowEndCycle(false);
+          }}
+        />
+      )}
+
       {showLinkPO && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
@@ -540,6 +569,10 @@ export default function Stok() {
                 className={`text-xs font-semibold px-3 py-1.5 rounded-full border-0 cursor-pointer ${STATUS_BADGE[selected.status]||'bg-gray-100 text-gray-600'}`}>
                 {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
+              <button onClick={() => setShowEndCycle(true)}
+                className="border border-orange-200 text-orange-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-orange-50">
+                🔄 End Cycle
+              </button>
               <button onClick={() => setShowLinkPO(true)}
                 className="border border-blue-200 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-50">
                 🔗 Link PO
@@ -682,6 +715,151 @@ export default function Stok() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── End Cycle Modal ──────────────────────────────────────────────────────────
+function EndCycleModal({ stock, tranches, rates, provs, onClose, onConfirm }) {
+  const [cycleDate, setCycleDate] = useState(today());
+  const [manualDeductions, setManualDeductions] = useState([]);
+  const [saving, setSaving] = useState(false);
+
+  const bankRate = (parseFloat(rates?.bankRate) || 6.5) / 100;
+
+  const addManual = () => setManualDeductions(p => [...p, { id: Date.now().toString(), label:'', vol:'' }]);
+  const setMd = (id,k,v) => setManualDeductions(p => p.map(x => x.id===id ? {...x,[k]:v} : x));
+  const removeMd = id => setManualDeductions(p => p.filter(x => x.id!==id));
+
+  // Blended modal (PPN excluded)
+  let tv=0,tval=0;
+  tranches.forEach(t => {
+    const vol=parseFloat(t.vol)||0,base=parseFloat(t.basePrice)||0;
+    const bphR=(parseFloat(rates?.bphMigas)||0)/100;
+    const prov=provs?.find(p=>p.name===t.pbbkbProvince);
+    const pbR=(t.applyPBBKB&&!t.noPbbkb)?(parseFloat(prov?.rate)||0)/100:0;
+    tv+=vol; tval+=(base+base*pbR+(t.applyBPHBuy?base*bphR:0))*vol;
+  });
+  const blendedModal = tv>0?tval/tv:0;
+  const totalVol = tv;
+
+  // Weighted average load date
+  let dateN=0,dateD=0;
+  tranches.forEach(t => { const vol=parseFloat(t.vol)||0, d=t.loadDate?new Date(t.loadDate).getTime():Date.now(); dateN+=d*vol; dateD+=vol; });
+  const avgLoadDate = dateD>0 ? new Date(dateN/dateD).toISOString().slice(0,10) : today();
+
+  const daysHeld = Math.max(0, daysBetween(avgLoadDate, cycleDate));
+  const comPerL = blendedModal*(Math.pow(1+bankRate, daysHeld/365)-1);
+  const newCostPerL = blendedModal + comPerL;
+
+  const soDeduction = stock.committedVolume || 0;
+  const manualTotal = manualDeductions.reduce((s,m)=>s+(parseFloat(m.vol)||0),0);
+  const remaining = Math.max(0, totalVol - soDeduction - manualTotal);
+
+  const fmt  = (v,d=2) => new Intl.NumberFormat('id-ID',{minimumFractionDigits:d,maximumFractionDigits:d}).format(Number(v)||0);
+  const fmtV = v => Number(v).toLocaleString('id-ID');
+
+  const handleConfirm = async () => {
+    if (remaining<=0) { alert('Remaining volume is zero or negative.'); return; }
+    setSaving(true);
+    const rollover = {
+      id: Date.now().toString()+Math.random(),
+      supplier:'Cycle Rollover', vessel:'',
+      basePrice: String(Math.round(newCostPerL*100)/100),
+      vol: String(Math.round(remaining)),
+      loadDate: cycleDate, payDate: cycleDate,
+      applyPPN:false, applyPBBKB:false, noPbbkb:false, pbbkbProvince:'', applyBPHBuy:false,
+      isCycleRollover:true, cycleDate,
+      prevBlendedModal:blendedModal, prevCoM:comPerL, daysHeld,
+    };
+    await onConfirm(rollover);
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b">
+          <div>
+            <h2 className="font-bold text-gray-800">🔄 End Cycle — {stock.label}</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Consolidate remaining inventory into a new single tranche</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+        <div className="p-5 space-y-5">
+          {/* Current summary */}
+          <div className="bg-gray-50 rounded-xl p-4">
+            <p className="font-semibold text-gray-700 mb-3 text-sm">Current Position</p>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="text-gray-500">Total Volume</div><div className="font-mono text-right">{fmtV(totalVol)} L</div>
+              <div className="text-gray-500">Blended Modal</div><div className="font-mono text-right text-blue-700">{fmt(blendedModal)}/L</div>
+              <div className="text-gray-500">Tranches</div><div className="font-mono text-right">{tranches.length}</div>
+              <div className="text-gray-500">Avg Load Date</div><div className="font-mono text-right">{avgLoadDate}</div>
+            </div>
+          </div>
+
+          {/* New cycle date */}
+          <div>
+            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">New Cycle Date</label>
+            <input type="date" value={cycleDate} onChange={e=>setCycleDate(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"/>
+            <p className="text-[10px] text-gray-400 mt-0.5">
+              CoM calculated from avg load date ({avgLoadDate}) to this date: {daysHeld} days at {rates?.bankRate||6.5}% p.a.
+            </p>
+          </div>
+
+          {/* Deductions */}
+          <div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Deductions</p>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center bg-blue-50 rounded-lg px-3 py-2.5 text-sm">
+                <span className="text-blue-700">Committed to Sales Orders</span>
+                <span className="font-mono font-semibold text-blue-800">{fmtV(soDeduction)} L</span>
+              </div>
+              {manualDeductions.map(md=>(
+                <div key={md.id} className="flex items-center gap-2">
+                  <input type="text" value={md.label} onChange={e=>setMd(md.id,'label',e.target.value)}
+                    placeholder="Description (e.g. physical delivery)"
+                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"/>
+                  <input type="number" value={md.vol} onChange={e=>setMd(md.id,'vol',e.target.value)}
+                    placeholder="Volume (L)"
+                    className="w-32 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 font-mono"/>
+                  <button onClick={()=>removeMd(md.id)} className="text-red-400 hover:text-red-600 text-xs shrink-0">✕</button>
+                </div>
+              ))}
+              <button onClick={addManual}
+                className="text-xs border border-dashed border-gray-300 text-gray-500 px-3 py-2 rounded-lg hover:border-blue-400 hover:text-blue-600 w-full">
+                + Add Manual Deduction
+              </button>
+            </div>
+          </div>
+
+          {/* Preview */}
+          <div className={`rounded-xl p-4 border-2 ${remaining>0?'bg-green-50 border-green-200':'bg-red-50 border-red-200'}`}>
+            <p className="text-[10px] font-bold uppercase tracking-widest mb-3 text-gray-500">New Cycle Preview</p>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="text-gray-500 text-xs">Remaining Volume</div>
+              <div className={`font-mono font-bold text-right ${remaining>0?'text-green-700':'text-red-600'}`}>{fmtV(Math.round(remaining))} L</div>
+              <div className="text-gray-500 text-xs">Original Blended Modal</div>
+              <div className="font-mono text-right text-gray-700">{fmt(blendedModal)}/L</div>
+              <div className="text-gray-500 text-xs">+ Accumulated CoM ({daysHeld}d)</div>
+              <div className="font-mono text-right text-orange-600">+{fmt(comPerL)}/L</div>
+              <div className="text-gray-600 text-xs font-semibold border-t pt-2">New Base Cost</div>
+              <div className="font-mono font-bold text-right text-blue-800 border-t pt-2">{fmt(newCostPerL)}/L</div>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-3">
+              New cycle tranche has <b>no taxes applied</b> — all taxes were already included in the original tranche costs. This prevents double taxation on the rolled-over inventory.
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-3 p-5 border-t">
+          <button onClick={handleConfirm} disabled={saving||remaining<=0}
+            className="flex-1 bg-orange-500 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-orange-600 disabled:opacity-50">
+            {saving?'⏳ Processing…':'🔄 Confirm End Cycle'}
+          </button>
+          <button onClick={onClose} className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+        </div>
+      </div>
     </div>
   );
 }
