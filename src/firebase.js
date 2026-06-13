@@ -203,6 +203,12 @@ export async function getUserRole(email) {
   return userRoles[email] || 'staff';
 }
 
+// Get the email of whoever originally submitted a document
+export function getSubmitterEmail(approvalHistory) {
+  const entry = (approvalHistory || []).find(h => h.action === 'submit' || h.action === 'submitted');
+  return entry?.by || null;
+}
+
 // ─── Approval helpers ─────────────────────────────────────────────────────────
 // Apply an approval action to a document
 // action: 'submit' | 'approve' | 'reject'

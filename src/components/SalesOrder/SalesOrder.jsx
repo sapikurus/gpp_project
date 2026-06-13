@@ -3,7 +3,7 @@ import { useApp } from '../../App.jsx';
 import {
   fetchCollection, createNumberedDoc, updateSubDoc, deleteSubDoc,
   SOS_REF, STOCKS_REF, OLS_REF, applyApprovalDirect, approveSoFinal,
-  getApproverEmails, sendApprovalEmail,
+  getApproverEmails, sendApprovalEmail, getSubmitterEmail,
 } from '../../firebase.js';
 import { today, formatIDR, formatDateID, toRoman } from '../../utils/utils.js';
 import {
@@ -132,25 +132,32 @@ export default function SalesOrder() {
     try {
       const next = nextStatus(chain, so.approvalStatus);
       const histEntry = { role: userRole, action: 'approved', by: user.email, at: Date.now(), note };
+      const submitterEmail = getSubmitterEmail(so.approvalHistory);
+
       if (next === 'approved') {
         await approveSoFinal({ soId: so.id, soData: so, historyEntry: histEntry });
+        // Notify submitter — fully approved
+        try {
+          if (submitterEmail) await sendApprovalEmail(appData?.settings, {
+            to: [submitterEmail],
+            subject: `[GPP Portal] SO ${so.docNumber} — Approved ✅`,
+            body: `Your Sales Order ${so.docNumber} has been fully approved.\n\nClient: ${so.clientName||'–'}\nVolume: ${so.volume ? Number(so.volume).toLocaleString('id-ID')+' L' : '–'}\n\nStock has been deducted accordingly.\nOpen in app: https://app.globalpetro.co.id/sales-order`,
+          });
+        } catch(e) {}
       } else {
         await applyApprovalDirect(SOS_REF(), so.id, so.approvalHistory, {
           action: 'approve', nextApprovalStatus: next,
           role: userRole, email: user.email, note,
         });
-        // Notify directors when manager passes it up
         if (next === 'pending_director') {
+          // Notify directors + submitter that it's passed to director
           try {
             const approvers = await getApproverEmails();
+            const toList = [...new Set([...approvers.directors, submitterEmail].filter(Boolean))];
             await sendApprovalEmail(appData?.settings, {
-              to: approvers.directors,
-              subject: `[GPP Portal] SO ${so.docNumber} Awaiting Director Approval`,
-              body:
-                `Sales Order ${so.docNumber} has been approved by the Manager and requires Director approval.\n\n` +
-                `Client: ${so.clientName || '–'}\n` +
-                `Volume: ${so.volume ? Number(so.volume).toLocaleString('id-ID') + ' L' : '–'}\n` +
-                `Open in app: https://app.globalpetro.co.id/sales-order`,
+              to: toList,
+              subject: `[GPP Portal] SO ${so.docNumber} — Awaiting Director Approval`,
+              body: `Sales Order ${so.docNumber} has been approved by the Manager and requires Director approval.\n\nClient: ${so.clientName||'–'}\nVolume: ${so.volume ? Number(so.volume).toLocaleString('id-ID')+' L' : '–'}\n\nOpen in app: https://app.globalpetro.co.id/sales-order`,
             });
           } catch(e) {}
         }
@@ -167,6 +174,15 @@ export default function SalesOrder() {
         action: 'reject', nextApprovalStatus: 'rejected',
         role: userRole, email: user.email, note,
       });
+      // Notify submitter of rejection
+      try {
+        const submitterEmail = getSubmitterEmail(so.approvalHistory);
+        if (submitterEmail) await sendApprovalEmail(appData?.settings, {
+          to: [submitterEmail],
+          subject: `[GPP Portal] SO ${so.docNumber} — Rejected ❌`,
+          body: `Your Sales Order ${so.docNumber} has been rejected.\n\nClient: ${so.clientName||'–'}\nRejection reason: ${note || '(no reason provided)'}\nRejected by: ${user.email}\n\nPlease correct and resubmit. Open in app: https://app.globalpetro.co.id/sales-order`,
+        });
+      } catch(e) {}
       setSOs(await fetchCollection(SOS_REF())); setShowDetail(null);
     } finally { setSaving(false); }
   };
@@ -259,13 +275,16 @@ export default function SalesOrder() {
             </div>
             <div className="p-5 space-y-4">
               <div className="bg-gray-50 rounded-xl p-4 grid grid-cols-2 gap-3 text-sm">
-                {[['Product', so.product||'-'],['Volume', so.volume ? Number(so.volume).toLocaleString('id-ID')+' L' : '-'],
-                  ['Harga', so.agreedPrice ? formatIDR(so.agreedPrice)+'/L' : '-'],['Terms', `${so.paymentTerms} ${so.clientTOP ? `(${so.clientTOP}d)` : ''}`],
-                  ['Lokasi', so.deliveryLocation||'-'],['Provinsi', so.deliveryProvince||'-']
+                {[
+                  ['Product',  showDetail.product||'-'],
+                  ['Volume',   showDetail.volume ? Number(showDetail.volume).toLocaleString('id-ID')+' L' : '-'],
+                  ['Price',    showDetail.agreedPrice ? formatIDR(showDetail.agreedPrice)+'/L' : '-'],
+                  ['Terms',    `${showDetail.paymentTerms||''} ${showDetail.clientTOP ? `(${showDetail.clientTOP}d)` : ''}`],
+                  ['Delivery', showDetail.deliveryLocation||'-'],
+                  ['Province', showDetail.deliveryProvince||'-'],
                 ].map(([k,v]) => (
                   <div key={k}><p className="text-xs text-gray-400">{k}</p><p className="font-medium text-gray-700">{v}</p></div>
                 ))}
-                {(() => { const s = showDetail; return s ? null : null; })()}
               </div>
               {/* Show stok availability warning */}
               {(() => {

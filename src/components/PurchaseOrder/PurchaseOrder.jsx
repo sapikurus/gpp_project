@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../../App.jsx';
-import { fetchCollection, createNumberedDoc, updateSubDoc, deleteSubDoc, POS_REF, getApproverEmails, sendApprovalEmail } from '../../firebase.js';
+import { fetchCollection, createNumberedDoc, updateSubDoc, deleteSubDoc, POS_REF, getApproverEmails, sendApprovalEmail, getSubmitterEmail } from '../../firebase.js';
 import { formatIDR, formatDateID, buildPONumber, today, terbilang } from '../../utils/utils.js';
 import { getPOChain, firstPending, nextStatus, isEditable, isApproved, statusMeta, canDelete, DEFAULT_PO_THRESHOLD } from '../../utils/approvalUtils.js';
 import ApprovalPanel, { StatusBadge, DraftWatermark } from '../Layout/ApprovalPanel.jsx';
@@ -30,7 +30,6 @@ export default function PurchaseOrder() {
   // Chain is computed per-document based on value — not a single static chain
   const chainFor = (po) => po?.effectiveChain || getPOChain(appData?.settings, po?.totalOrder || 0);
   const threshold = parseFloat(appData?.settings?.poApprovalThreshold) || DEFAULT_PO_THRESHOLD;
-  const { t } = useLang();
 
   useEffect(() => { fetchCollection(POS_REF()).then(p => { setPOs(p); setLoading(false); }); }, []);
 
@@ -104,17 +103,27 @@ export default function PurchaseOrder() {
       const next = nextStatus(chain, po.approvalStatus);
       const h = [...(po.approvalHistory||[]), { role:userRole, action:'approved', by:user.email, at:Date.now(), note }];
       await updateSubDoc(POS_REF(), po.id, { approvalStatus: next, approvalHistory: h });
-      // Notify director if manager approved and director still needs to approve
-      if (next === `pending_director`) {
+
+      const submitterEmail = getSubmitterEmail(po.approvalHistory);
+      if (next === 'approved') {
+        // Final approval — notify submitter
+        try {
+          const toList = [...new Set([submitterEmail].filter(Boolean))];
+          if (toList.length) await sendApprovalEmail(appData?.settings, {
+            to: toList,
+            subject: `[GPP Portal] PO ${po.docNumber} — Approved ✅`,
+            body: `Your Purchase Order ${po.docNumber} has been fully approved.\n\nVendor: ${po.vendorName||'–'}\nTotal: ${new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(po.totalOrder||0)}\n\nOpen in app: https://app.globalpetro.co.id/purchase-order`,
+          });
+        } catch(e) {}
+      } else if (next === 'pending_director') {
+        // Passed to director — notify directors AND submitter
         try {
           const approvers = await getApproverEmails();
+          const toList = [...new Set([...approvers.directors, submitterEmail].filter(Boolean))];
           await sendApprovalEmail(appData?.settings, {
-            to: approvers.directors,
-            subject: `[GPP Portal] PO ${po.docNumber} Awaiting Director Approval`,
-            body: `Purchase Order ${po.docNumber} has been approved by the Manager and now requires Director approval.\n\n` +
-                  `Vendor: ${po.vendorName || '–'}\n` +
-                  `Total: ${new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(po.totalOrder||0)}\n` +
-                  `Open in app: https://app.globalpetro.co.id/purchase-order`,
+            to: toList,
+            subject: `[GPP Portal] PO ${po.docNumber} — Awaiting Director Approval`,
+            body: `Purchase Order ${po.docNumber} has been approved by the Manager and now requires Director approval.\n\nVendor: ${po.vendorName||'–'}\nTotal: ${new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(po.totalOrder||0)}\n\nOpen in app: https://app.globalpetro.co.id/purchase-order`,
           });
         } catch(e) {}
       }
@@ -127,6 +136,15 @@ export default function PurchaseOrder() {
     try {
       const h = [...(po.approvalHistory||[]), { role:userRole, action:'rejected', by:user.email, at:Date.now(), note }];
       await updateSubDoc(POS_REF(), po.id, { approvalStatus:'rejected', approvalHistory: h });
+      // Notify submitter of rejection
+      try {
+        const submitterEmail = getSubmitterEmail(po.approvalHistory);
+        if (submitterEmail) await sendApprovalEmail(appData?.settings, {
+          to: [submitterEmail],
+          subject: `[GPP Portal] PO ${po.docNumber} — Rejected ❌`,
+          body: `Your Purchase Order ${po.docNumber} has been rejected.\n\nVendor: ${po.vendorName||'–'}\nRejection reason: ${note || '(no reason provided)'}\nRejected by: ${user.email}\n\nPlease correct and resubmit. Open in app: https://app.globalpetro.co.id/purchase-order`,
+        });
+      } catch(e) {}
       setPOs(await fetchCollection(POS_REF())); setShowApproval(null);
     } finally { setSaving(false); }
   };
