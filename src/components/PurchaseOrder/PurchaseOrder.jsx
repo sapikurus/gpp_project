@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../../App.jsx';
-import { fetchCollection, createNumberedDoc, updateSubDoc, deleteSubDoc, POS_REF } from '../../firebase.js';
+import { fetchCollection, createNumberedDoc, updateSubDoc, deleteSubDoc, POS_REF, getApproverEmails, sendApprovalEmail } from '../../firebase.js';
 import { formatIDR, formatDateID, buildPONumber, today, terbilang } from '../../utils/utils.js';
-import { getChain, firstPending, nextStatus, isEditable, isApproved, statusMeta, canDelete } from '../../utils/approvalUtils.js';
-import { useLang } from '../../utils/i18n.jsx';
+import { getPOChain, firstPending, nextStatus, isEditable, isApproved, statusMeta, canDelete, DEFAULT_PO_THRESHOLD } from '../../utils/approvalUtils.js';
 import ApprovalPanel, { StatusBadge, DraftWatermark } from '../Layout/ApprovalPanel.jsx';
 import PrintWrapper from '../Layout/PrintWrapper.jsx';
 import logo from '../../assets/gpp-logo.png';
@@ -28,7 +27,9 @@ export default function PurchaseOrder() {
   const pbbkbProvinces = appData?.pbbkbProvinces || [];
   const rates = appData?.rates || {};
   const co = appData?.headOffice || appData?.company || {};
-  const chain = getChain(appData?.settings, 'po');
+  // Chain is computed per-document based on value — not a single static chain
+  const chainFor = (po) => po?.effectiveChain || getPOChain(appData?.settings, po?.totalOrder || 0);
+  const threshold = parseFloat(appData?.settings?.poApprovalThreshold) || DEFAULT_PO_THRESHOLD;
   const { t } = useLang();
 
   useEffect(() => { fetchCollection(POS_REF()).then(p => { setPOs(p); setLoading(false); }); }, []);
@@ -66,9 +67,69 @@ export default function PurchaseOrder() {
     await deleteSubDoc(POS_REF(), id); setPOs(p => p.filter(x => x.id !== id));
   };
 
-  const handleSubmit = async (po) => { setSaving(true); try { const h=[...(po.approvalHistory||[]),{role:userRole,action:'submit',by:user.email,at:Date.now(),note:''}]; await updateSubDoc(POS_REF(),po.id,{approvalStatus:firstPending(chain),approvalHistory:h}); setPOs(await fetchCollection(POS_REF())); setShowApproval(null); } finally { setSaving(false); } };
-  const handleApprove = async (po,note) => { setSaving(true); try { const next=nextStatus(chain,po.approvalStatus); const h=[...(po.approvalHistory||[]),{role:userRole,action:'approved',by:user.email,at:Date.now(),note}]; await updateSubDoc(POS_REF(),po.id,{approvalStatus:next,approvalHistory:h}); setPOs(await fetchCollection(POS_REF())); setShowApproval(null); } finally { setSaving(false); } };
-  const handleReject = async (po,note) => { setSaving(true); try { const h=[...(po.approvalHistory||[]),{role:userRole,action:'rejected',by:user.email,at:Date.now(),note}]; await updateSubDoc(POS_REF(),po.id,{approvalStatus:'rejected',approvalHistory:h}); setPOs(await fetchCollection(POS_REF())); setShowApproval(null); } finally { setSaving(false); } };
+  const handleSubmit = async (po) => {
+    setSaving(true);
+    try {
+      const chain = chainFor(po);
+      const firstStatus = firstPending(chain);
+      const h = [...(po.approvalHistory||[]), { role:userRole, action:'submit', by:user.email, at:Date.now(), note:'' }];
+      await updateSubDoc(POS_REF(), po.id, {
+        approvalStatus: firstStatus,
+        approvalHistory: h,
+        effectiveChain: chain, // Store chain so it's consistent even if threshold changes
+      });
+      // Email notification — fire and forget, never blocks approval flow
+      try {
+        const approvers = await getApproverEmails();
+        const approvalLabel = chain.length > 1 ? 'Manager → Director' : 'Manager';
+        await sendApprovalEmail(appData?.settings, {
+          to: approvers.all,
+          subject: `[GPP Portal] PO ${po.docNumber} Awaiting Approval`,
+          body: `Purchase Order ${po.docNumber} has been submitted for approval.\n\n` +
+                `Vendor: ${po.vendorName || '–'}\n` +
+                `Total: ${new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(po.totalOrder||0)}\n` +
+                `Approval required: ${approvalLabel}\n` +
+                `Submitted by: ${user.email}\n\n` +
+                `Open in app: https://app.globalpetro.co.id/purchase-order`,
+        });
+      } catch (emailErr) { console.warn('Email failed:', emailErr); }
+      setPOs(await fetchCollection(POS_REF())); setShowApproval(null);
+    } finally { setSaving(false); }
+  };
+
+  const handleApprove = async (po, note) => {
+    setSaving(true);
+    try {
+      const chain = chainFor(po);
+      const next = nextStatus(chain, po.approvalStatus);
+      const h = [...(po.approvalHistory||[]), { role:userRole, action:'approved', by:user.email, at:Date.now(), note }];
+      await updateSubDoc(POS_REF(), po.id, { approvalStatus: next, approvalHistory: h });
+      // Notify director if manager approved and director still needs to approve
+      if (next === `pending_director`) {
+        try {
+          const approvers = await getApproverEmails();
+          await sendApprovalEmail(appData?.settings, {
+            to: approvers.directors,
+            subject: `[GPP Portal] PO ${po.docNumber} Awaiting Director Approval`,
+            body: `Purchase Order ${po.docNumber} has been approved by the Manager and now requires Director approval.\n\n` +
+                  `Vendor: ${po.vendorName || '–'}\n` +
+                  `Total: ${new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(po.totalOrder||0)}\n` +
+                  `Open in app: https://app.globalpetro.co.id/purchase-order`,
+          });
+        } catch(e) {}
+      }
+      setPOs(await fetchCollection(POS_REF())); setShowApproval(null);
+    } finally { setSaving(false); }
+  };
+
+  const handleReject = async (po, note) => {
+    setSaving(true);
+    try {
+      const h = [...(po.approvalHistory||[]), { role:userRole, action:'rejected', by:user.email, at:Date.now(), note }];
+      await updateSubDoc(POS_REF(), po.id, { approvalStatus:'rejected', approvalHistory: h });
+      setPOs(await fetchCollection(POS_REF())); setShowApproval(null);
+    } finally { setSaving(false); }
+  };
 
   if (printing) return (<PrintWrapper onClose={()=>setPrinting(null)}><DraftWatermark status={printing.approvalStatus}/><POPrint data={printing} company={co} rates={rates} pbbkbProvinces={pbbkbProvinces}/></PrintWrapper>);
 
@@ -79,7 +140,29 @@ export default function PurchaseOrder() {
           <div><h2 className="font-bold text-gray-800">{showApproval.docNumber}</h2><p className="text-xs text-gray-400">{showApproval.vendorName} · {formatIDR(showApproval.totalOrder)}</p></div>
           <button onClick={()=>setShowApproval(null)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
         </div>
-        <div className="p-5"><ApprovalPanel doc={showApproval} docType="po" chain={chain} userRole={userRole} userEmail={user?.email} onSubmit={()=>handleSubmit(showApproval)} onApprove={note=>handleApprove(showApproval,note)} onReject={note=>handleReject(showApproval,note)} saving={saving}/></div>
+        <div className="p-5">
+          {/* Threshold indicator */}
+          {showApproval && (
+            <div className={`mb-3 text-xs rounded-lg px-3 py-2 flex items-center gap-2 ${
+              (showApproval.totalOrder || 0) >= threshold
+                ? 'bg-orange-50 text-orange-700 border border-orange-100'
+                : 'bg-blue-50 text-blue-700 border border-blue-100'
+            }`}>
+              {(showApproval.totalOrder || 0) >= threshold
+                ? `⚠ Above threshold (${new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(threshold)}) — Manager + Director approval required`
+                : `✓ Below threshold — Manager approval only`}
+            </div>
+          )}
+          <ApprovalPanel
+            doc={showApproval} docType="po"
+            chain={chainFor(showApproval)}
+            userRole={userRole} userEmail={user?.email}
+            onSubmit={() => handleSubmit(showApproval)}
+            onApprove={note => handleApprove(showApproval, note)}
+            onReject={note => handleReject(showApproval, note)}
+            saving={saving}
+          />
+        </div>
       </div>
     </div>
   );

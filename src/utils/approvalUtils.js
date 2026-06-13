@@ -46,6 +46,21 @@ export const statusMeta = (status) => ({
 // Roles that can approve anything (bypass chain)
 export const isSuperRole = (role) => role === 'director' || role === 'superadmin';
 
+// ─── PO threshold-based dynamic chain ─────────────────────────────────────────
+export const DEFAULT_PO_THRESHOLD = 5_000_000_000; // Rp 5 billion
+
+// Returns the approval chain for a PO based on its value.
+// Under threshold → manager only. At/above → full configured chain.
+export const getPOChain = (settings, totalOrder) => {
+  const threshold = parseFloat(settings?.poApprovalThreshold) || DEFAULT_PO_THRESHOLD;
+  const fullChain = settings?.approvalChain?.po || DEFAULT_CHAINS.po;
+  if ((parseFloat(totalOrder) || 0) < threshold) {
+    // Under threshold: only the first approver in the chain (typically manager)
+    return [fullChain[0] || 'manager'];
+  }
+  return fullChain; // Full chain required
+};
+
 // Can this role see master data
 export const canSeeMasterData = (role) =>
   role === 'director' || role === 'superadmin';

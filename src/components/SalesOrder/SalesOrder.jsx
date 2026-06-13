@@ -3,6 +3,7 @@ import { useApp } from '../../App.jsx';
 import {
   fetchCollection, createNumberedDoc, updateSubDoc, deleteSubDoc,
   SOS_REF, STOCKS_REF, OLS_REF, applyApprovalDirect, approveSoFinal,
+  getApproverEmails, sendApprovalEmail,
 } from '../../firebase.js';
 import { today, formatIDR, formatDateID, toRoman } from '../../utils/utils.js';
 import {
@@ -107,6 +108,21 @@ export default function SalesOrder() {
         action: 'submit', nextApprovalStatus: firstPending(chain),
         role: userRole, email: user.email, note: '',
       });
+      // Email all managers + directors simultaneously
+      try {
+        const approvers = await getApproverEmails();
+        await sendApprovalEmail(appData?.settings, {
+          to: approvers.all,
+          subject: `[GPP Portal] SO ${so.docNumber} Awaiting Approval`,
+          body:
+            `Sales Order ${so.docNumber} has been submitted for approval.\n\n` +
+            `Client: ${so.clientName || '–'}\n` +
+            `Volume: ${so.volume ? Number(so.volume).toLocaleString('id-ID') + ' L' : '–'}\n` +
+            `Agreed Price: ${so.agreedPrice ? 'Rp ' + Number(so.agreedPrice).toLocaleString('id-ID') + '/L' : '–'}\n` +
+            `Submitted by: ${user.email}\n\n` +
+            `Open in app: https://app.globalpetro.co.id/sales-order`,
+        });
+      } catch (emailErr) { console.warn('SO email failed:', emailErr); }
       setSOs(await fetchCollection(SOS_REF())); setShowDetail(null);
     } finally { setSaving(false); }
   };
@@ -117,13 +133,27 @@ export default function SalesOrder() {
       const next = nextStatus(chain, so.approvalStatus);
       const histEntry = { role: userRole, action: 'approved', by: user.email, at: Date.now(), note };
       if (next === 'approved') {
-        // Final approval — run transaction to deduct from stock
         await approveSoFinal({ soId: so.id, soData: so, historyEntry: histEntry });
       } else {
         await applyApprovalDirect(SOS_REF(), so.id, so.approvalHistory, {
           action: 'approve', nextApprovalStatus: next,
           role: userRole, email: user.email, note,
         });
+        // Notify directors when manager passes it up
+        if (next === 'pending_director') {
+          try {
+            const approvers = await getApproverEmails();
+            await sendApprovalEmail(appData?.settings, {
+              to: approvers.directors,
+              subject: `[GPP Portal] SO ${so.docNumber} Awaiting Director Approval`,
+              body:
+                `Sales Order ${so.docNumber} has been approved by the Manager and requires Director approval.\n\n` +
+                `Client: ${so.clientName || '–'}\n` +
+                `Volume: ${so.volume ? Number(so.volume).toLocaleString('id-ID') + ' L' : '–'}\n` +
+                `Open in app: https://app.globalpetro.co.id/sales-order`,
+            });
+          } catch(e) {}
+        }
       }
       setSOs(await fetchCollection(SOS_REF())); setStocks(await fetchCollection(STOCKS_REF()));
       setShowDetail(null);

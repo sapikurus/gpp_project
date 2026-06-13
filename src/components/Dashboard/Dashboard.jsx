@@ -46,7 +46,14 @@ export default function Dashboard() {
   }, []);
 
   const pendingItems = [
-    ...pos.filter(p => canApprove(userRole, p.approvalStatus, chain_po)).map(p => ({ type:'po', doc:p, number:p.docNumber, name:p.vendorName, amount:formatIDR(p.totalOrder) })),
+    ...pos.filter(p => {
+      // PO uses threshold-based dynamic chain stored on the document
+      const chain = p.effectiveChain || (
+        (p.totalOrder || 0) >= (appData?.settings?.poApprovalThreshold || 5_000_000_000)
+          ? ['manager','director'] : ['manager']
+      );
+      return canApprove(userRole, p.approvalStatus, chain);
+    }).map(p => ({ type:'po', doc:p, number:p.docNumber, name:p.vendorName, amount:formatIDR(p.totalOrder) })),
     ...sos.filter(s => canApprove(userRole, s.approvalStatus, chain_so)).map(s => ({ type:'so', doc:s, number:s.docNumber, name:s.clientName, amount:s.volume ? Number(s.volume).toLocaleString('id-ID')+' L' : '' })),
     ...ols.filter(o => canApprove(userRole, o.approvalStatus, chain_ol)).map(o => ({ type:'ol', doc:o, number:o.docNumber, name:o.clientName, amount:o.dpp ? `${Number(o.dpp).toLocaleString('id-ID')}/L` : '' })),
   ];

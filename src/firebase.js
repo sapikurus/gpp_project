@@ -167,8 +167,36 @@ export async function importBackup(json) {
   await updateDoc(DATA_REF(), safeFields);
 }
 
-// ─── Role helpers ─────────────────────────────────────────────────────────────
-// Get role for a user email from userRoles map
+// ─── Approval email helpers ───────────────────────────────────────────────────
+// Collect all manager + director emails from userRoles map
+export async function getApproverEmails() {
+  const snap = await getDoc(DATA_REF());
+  const userRoles = snap.data()?.userRoles || {};
+  const managers = [], directors = [];
+  Object.entries(userRoles).forEach(([email, role]) => {
+    if (role === 'manager')                       managers.push(email);
+    if (role === 'director' || role === 'superadmin') directors.push(email);
+  });
+  return { managers, directors, all: [...new Set([...managers, ...directors])] };
+}
+
+// Send notification via the configured GAS email endpoint
+// Fails silently — never blocks the approval flow
+export async function sendApprovalEmail(settings, { to, subject, body }) {
+  const endpoint = settings?.emailEndpoint;
+  if (!endpoint || !to?.length) return;
+  try {
+    const params = new URLSearchParams({
+      action:  'email',
+      to:      to.join(','),
+      subject,
+      body,
+    });
+    await fetch(`${endpoint}?${params.toString()}`);
+  } catch (e) {
+    console.warn('Email notification failed (non-blocking):', e.message);
+  }
+}
 export async function getUserRole(email) {
   const snap = await getDoc(DATA_REF());
   const userRoles = snap.data()?.userRoles || {};

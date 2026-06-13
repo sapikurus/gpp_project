@@ -763,6 +763,16 @@ function Settings() {
   const [endpoint, setEndpoint] = useState(appData?.settings?.mopsEndpoint || '');
   const [savingEP, setSavingEP] = useState(false);
   const [savedEP, setSavedEP]   = useState(false);
+  const [emailEndpoint, setEmailEndpoint] = useState(appData?.settings?.emailEndpoint || '');
+  const [savingEmailEP, setSavingEmailEP] = useState(false);
+  const [savedEmailEP, setSavedEmailEP]   = useState(false);
+  const [poThreshold, setPoThreshold] = useState(
+    appData?.settings?.poApprovalThreshold != null
+      ? String(appData.settings.poApprovalThreshold)
+      : '5000000000'
+  );
+  const [savingThreshold, setSavingThreshold] = useState(false);
+  const [savedThreshold, setSavedThreshold]   = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [msg, setMsg] = useState('');
@@ -787,6 +797,8 @@ function Settings() {
   const toggleChainRole = (dt,role) => setChains(p=>{const cur=p[dt]||[];const has=cur.includes(role);let next=has?cur.filter(r=>r!==role):[...cur,role];next=CHAIN_ROLES.filter(r=>next.includes(r));if(next.length===0)next=['director'];return{...p,[dt]:next};});
   const saveChain = async () => { setSavingChain(true); try{await patchField('settings',{...(appData?.settings||{}),approvalChain:chains});await reload();setSavedChain(true);setTimeout(()=>setSavedChain(false),2500);}finally{setSavingChain(false);} };
   const saveEndpoint = async () => { setSavingEP(true); try{await patchField('settings',{...(appData?.settings||{}),mopsEndpoint:endpoint});await reload();setSavedEP(true);setTimeout(()=>setSavedEP(false),2500);}finally{setSavingEP(false);} };
+  const saveEmailEndpoint = async () => { setSavingEmailEP(true); try{await patchField('settings',{...(appData?.settings||{}),emailEndpoint:emailEndpoint.trim()});await reload();setSavedEmailEP(true);setTimeout(()=>setSavedEmailEP(false),2500);}finally{setSavingEmailEP(false);} };
+  const saveThreshold = async () => { setSavingThreshold(true); try{await patchField('settings',{...(appData?.settings||{}),poApprovalThreshold:parseFloat(poThreshold)||5000000000});await reload();setSavedThreshold(true);setTimeout(()=>setSavedThreshold(false),2500);}finally{setSavingThreshold(false);} };
   const doExport = async () => { setExporting(true); try{const data=await exportBackup();const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`gpp-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(url);setMsg('✅ Backup berhasil diunduh.');}catch(e){setMsg('❌ Export gagal: '+e.message);}finally{setExporting(false);setTimeout(()=>setMsg(''),4000);} };
   const doImport = async (e) => { const file=e.target.files[0];if(!file)return;if(!confirm('Restore backup ini?'))return;setImporting(true);try{const json=JSON.parse(await file.text());await importBackup(json);await reload();setMsg('✅ Restore berhasil.');}catch(err){setMsg('❌ Import gagal: '+err.message);}finally{setImporting(false);e.target.value='';setTimeout(()=>setMsg(''),4000);} };
 
@@ -842,12 +854,76 @@ function Settings() {
       </Card>
 
       <Card title="📡 MOPS Endpoint">
+        <p className="text-xs text-gray-400 mb-3">Google Apps Script URL for fetching live MOPS and pricing data.</p>
         <div className="flex gap-2">
           <input type="text" value={endpoint} onChange={e=>setEndpoint(e.target.value)} placeholder="https://script.google.com/macros/s/..."
             className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 font-mono text-xs"/>
           <button onClick={saveEndpoint} disabled={savingEP} className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-60 shrink-0">{savingEP?'⏳':savedEP?'✅':'💾'}</button>
         </div>
-        {endpoint&&<p className="text-xs text-green-600 mt-2">✅ Endpoint terkonfigurasi</p>}
+        {endpoint && <p className="text-xs text-green-600 mt-2">✅ MOPS endpoint configured</p>}
+      </Card>
+
+      <Card title="📧 Email Notification Endpoint">
+        <p className="text-xs text-gray-400 mb-2">
+          Google Apps Script URL for sending approval email notifications. When a PO or SO is submitted,
+          emails are sent simultaneously to all Managers and Directors.
+        </p>
+        <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-3 text-xs text-blue-700">
+          <p className="font-semibold mb-1">GAS script — add this handler to your existing doGet() function:</p>
+          <pre className="font-mono whitespace-pre-wrap text-[10px] leading-relaxed bg-white rounded p-2 border border-blue-100">{`if (e.parameter.action === 'email') {
+  const to      = e.parameter.to || '';
+  const subject = e.parameter.subject || 'GPP Portal';
+  const body    = e.parameter.body || '';
+  MailApp.sendEmail(to, subject, body);
+  return ContentService
+    .createTextOutput(JSON.stringify({ success: true }))
+    .setMimeType(ContentService.MimeType.JSON);
+}`}</pre>
+          <p className="mt-2">Re-deploy the GAS script as a Web App after adding this code. The URL is the same — paste it below.</p>
+        </div>
+        <div className="flex gap-2">
+          <input type="text" value={emailEndpoint} onChange={e=>setEmailEndpoint(e.target.value)}
+            placeholder="https://script.google.com/macros/s/..."
+            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 font-mono text-xs"/>
+          <button onClick={saveEmailEndpoint} disabled={savingEmailEP}
+            className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-60 shrink-0">
+            {savingEmailEP ? '⏳' : savedEmailEP ? '✅' : '💾'}
+          </button>
+        </div>
+        {emailEndpoint && <p className="text-xs text-green-600 mt-2">✅ Email endpoint configured</p>}
+        {!emailEndpoint && <p className="text-xs text-amber-600 mt-2">⚠ Not configured — approval notifications will not be sent</p>}
+      </Card>
+
+      <Card title="💰 PO Approval Threshold">
+        <p className="text-xs text-gray-400 mb-3">
+          POs below this value require <b>Manager</b> approval only.
+          POs at or above this value require <b>Manager + Director</b> approval.
+        </p>
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-center">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-blue-500 mb-1">Below Threshold</p>
+            <p className="text-sm font-bold text-blue-800">Manager only</p>
+          </div>
+          <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 text-center">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-orange-500 mb-1">At / Above Threshold</p>
+            <p className="text-sm font-bold text-orange-800">Manager + Director</p>
+          </div>
+        </div>
+        <div className="flex gap-2 items-center">
+          <span className="text-sm text-gray-500 shrink-0">Rp</span>
+          <input type="number" value={poThreshold} onChange={e=>setPoThreshold(e.target.value)}
+            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 font-mono"
+            min="0" step="500000000"/>
+          <button onClick={saveThreshold} disabled={savingThreshold}
+            className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-60 shrink-0">
+            {savingThreshold ? '⏳' : savedThreshold ? '✅' : '💾'}
+          </button>
+        </div>
+        <p className="text-xs text-gray-400 mt-2">
+          Current threshold: <span className="font-mono font-semibold text-gray-600">
+            Rp {Number(poThreshold||5000000000).toLocaleString('id-ID')}
+          </span>
+        </p>
       </Card>
 
       <Card title="💾 Backup & Restore">
