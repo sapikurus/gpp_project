@@ -855,7 +855,7 @@ function Settings() {
   const runDiagnostics = async () => {
     setDiagLoading(true); setDiagResult(null); setCFResult(null);
     try {
-      const r = await getFCMDiagnostics(user?.email);
+      const r = await getFCMDiagnostics(user?.email, userRole);
       setDiagResult(r);
     } catch(e) { setDiagResult({ error: e.message }); }
     finally { setDiagLoading(false); }

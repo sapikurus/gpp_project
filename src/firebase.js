@@ -269,7 +269,7 @@ export function getSubmitterEmail(approvalHistory) {
 
 // ─── FCM Diagnostics ──────────────────────────────────────────────────────────
 // Returns a full status report for the admin diagnostic panel
-export async function getFCMDiagnostics(userEmail) {
+export async function getFCMDiagnostics(userEmail, userRole = 'staff') {
   const result = {
     vapidKey:      { ok: false, label: 'VAPID Key', detail: '' },
     serviceWorker: { ok: false, label: 'Service Worker', detail: '' },
@@ -342,10 +342,10 @@ export async function getFCMDiagnostics(userEmail) {
         if (userEmail) {
           const key = userEmail.replace(/\./g, '_');
           await setDoc(doc(db, FCM_TOKENS_COL, key), {
-            token, email: userEmail, updatedAt: Date.now(),
+            token, email: userEmail, role: userRole, updatedAt: Date.now(),
           }, { merge: true });
           result.firestoreToken.ok = true;
-          result.firestoreToken.detail = 'Token saved for ' + userEmail + ' ✓';
+          result.firestoreToken.detail = 'Token saved for ' + userEmail + ' (role: ' + userRole + ') ✓';
           result.registeredDevices = '≥1 (your device confirmed)';
         }
       } else {

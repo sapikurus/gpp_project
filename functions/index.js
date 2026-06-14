@@ -30,9 +30,11 @@ exports.sendApprovalPush = onDocumentCreated(
     tokensSnap.forEach(doc => {
       const d = doc.data();
       if (!d.token) return;
-      // Include if no role filter, or if user's role is in targetRoles
-      const roleMatch = targetRoles.length === 0 || targetRoles.includes(d.role)
-        || d.role === 'superadmin' || d.role === 'director';
+      const role = d.role || 'staff'; // default to staff if role not saved
+      const roleMatch = targetRoles.length === 0
+        || targetRoles.includes(role)
+        || role === 'superadmin'
+        || role === 'director';
       if (roleMatch) tokens.push(d.token);
     });
 
