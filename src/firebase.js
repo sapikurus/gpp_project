@@ -50,11 +50,17 @@ export async function initPushNotifications(userEmail, userRole) {
   try {
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') return;
-    // Wait for SW to be ready
-    const swReg = await navigator.serviceWorker.ready;
+    // Explicitly register the FCM service worker (don't rely on ready which may return a different SW)
+    const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
+    // Wait for it to become active
+    await new Promise(resolve => {
+      if (swReg.active) { resolve(); return; }
+      const sw = swReg.installing || swReg.waiting;
+      if (sw) { sw.addEventListener('statechange', e => { if (e.target.state === 'activated') resolve(); }); }
+      else setTimeout(resolve, 2000); // fallback
+    });
     const token = await getToken(getMsg(), { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
     if (!token) return;
-    // Save token keyed by email (sanitise . for Firestore)
     const key = userEmail.replace(/\./g, '_');
     await setDoc(doc(db, FCM_TOKENS_COL, key), {
       token, email: userEmail, role: userRole, updatedAt: Date.now(),
@@ -270,33 +276,44 @@ export async function getFCMDiagnostics(userEmail) {
     permission:    { ok: false, label: 'Notification Permission', detail: '' },
     token:         { ok: false, label: 'FCM Token (this device)', detail: '' },
     firestoreToken:{ ok: false, label: 'Token saved in Firestore', detail: '' },
-    registeredDevices: 0,
-    cloudFunction: { ok: null,  label: 'Cloud Function', detail: 'Will test when you send a notification' },
+    registeredDevices: '?',
+    cloudFunction: { ok: null, label: 'Cloud Function', detail: 'Use the test below' },
   };
 
   // 1. VAPID key
-  if (VAPID_KEY) {
+  if (VAPID_KEY && VAPID_KEY.length > 50) {
     result.vapidKey.ok = true;
-    result.vapidKey.detail = `Key loaded (${VAPID_KEY.length} chars)`;
+    result.vapidKey.detail = `Key loaded (${VAPID_KEY.length} chars) ✓`;
+  } else if (VAPID_KEY) {
+    result.vapidKey.detail = `Key looks truncated (${VAPID_KEY.length} chars — should be ~88). Re-enter the full key in Vercel and redeploy.`;
   } else {
     result.vapidKey.detail = 'VITE_FIREBASE_VAPID_KEY is empty. Add it in Vercel env vars and redeploy.';
   }
 
-  // 2. Service worker
+  // 2. Service worker — explicitly register/check firebase-messaging-sw.js
   if (!('serviceWorker' in navigator)) {
     result.serviceWorker.detail = 'Service Workers not supported in this browser.';
   } else {
     try {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      const fcmSW = regs.find(r => r.active?.scriptURL?.includes('firebase-messaging-sw'));
-      if (fcmSW) {
-        result.serviceWorker.ok = true;
-        result.serviceWorker.detail = 'Registered: ' + fcmSW.active.scriptURL;
-      } else {
-        result.serviceWorker.detail = 'firebase-messaging-sw.js not found. Try reloading the app.';
-      }
+      // Try to register explicitly
+      const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
+      const state = swReg.active?.state || swReg.installing?.state || swReg.waiting?.state || 'unknown';
+      result.serviceWorker.ok = true;
+      result.serviceWorker.detail = `Registered at /firebase-messaging-sw.js (state: ${swReg.active ? 'active' : state})`;
     } catch(e) {
-      result.serviceWorker.detail = 'Error: ' + e.message;
+      // File might not exist — check existing registrations
+      try {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        const fcmSW = regs.find(r => r.active?.scriptURL?.includes('firebase-messaging-sw'));
+        if (fcmSW) {
+          result.serviceWorker.ok = true;
+          result.serviceWorker.detail = 'Already registered: ' + fcmSW.active.scriptURL;
+        } else {
+          result.serviceWorker.detail = 'Registration failed: ' + e.message + '. Make sure the app was deployed after the last git push.';
+        }
+      } catch(e2) {
+        result.serviceWorker.detail = 'Error: ' + e.message;
+      }
     }
   }
 
@@ -304,9 +321,9 @@ export async function getFCMDiagnostics(userEmail) {
   const perm = Notification.permission;
   if (perm === 'granted') {
     result.permission.ok = true;
-    result.permission.detail = 'Granted';
+    result.permission.detail = 'Granted ✓';
   } else if (perm === 'denied') {
-    result.permission.detail = 'Denied by user — clear site permissions in browser settings and reload.';
+    result.permission.detail = 'Denied — clear site permissions in browser/phone settings and reload.';
   } else {
     result.permission.detail = 'Not yet requested — log out and back in to trigger the permission prompt.';
   }
@@ -314,41 +331,33 @@ export async function getFCMDiagnostics(userEmail) {
   // 4. FCM token for this device
   if (result.vapidKey.ok && result.serviceWorker.ok && result.permission.ok) {
     try {
-      const swReg = await navigator.serviceWorker.ready;
+      const regs = await navigator.serviceWorker.getRegistrations();
+      const swReg = regs.find(r => r.active?.scriptURL?.includes('firebase-messaging-sw'))
+        || await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
       const token = await getToken(getMsg(), { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
       if (token) {
         result.token.ok = true;
-        result.token.detail = token.slice(0, 20) + '…' + token.slice(-6);
-        // Save/refresh the token
+        result.token.detail = token.slice(0, 20) + '…' + token.slice(-6) + ' ✓';
+        // Save/refresh only current user's token
         if (userEmail) {
           const key = userEmail.replace(/\./g, '_');
           await setDoc(doc(db, FCM_TOKENS_COL, key), {
-            token, email: userEmail,
-            updatedAt: Date.now(),
+            token, email: userEmail, updatedAt: Date.now(),
           }, { merge: true });
           result.firestoreToken.ok = true;
-          result.firestoreToken.detail = 'Token saved / refreshed in Firestore.';
+          result.firestoreToken.detail = 'Token saved for ' + userEmail + ' ✓';
+          result.registeredDevices = '≥1 (your device confirmed)';
         }
       } else {
-        result.token.detail = 'getToken() returned null — check VAPID key and service worker.';
+        result.token.detail = 'getToken() returned null — VAPID key may still be wrong or SW not active yet.';
       }
     } catch(e) {
-      result.token.detail = 'Error getting token: ' + e.message;
+      result.token.detail = 'Error: ' + e.message;
+      result.firestoreToken.detail = 'Blocked by token error above.';
     }
   } else {
     result.token.detail = 'Cannot get token — fix issues above first.';
-    result.firestoreToken.detail = 'Waiting for token.';
-  }
-
-  // 5. Count all registered devices
-  try {
-    const snap = await getDocs(collection(db, FCM_TOKENS_COL));
-    result.registeredDevices = snap.size;
-    if (!result.firestoreToken.ok && snap.size > 0) {
-      result.firestoreToken.detail = `${snap.size} device(s) registered total (this device may not be included).`;
-    }
-  } catch(e) {
-    result.firestoreToken.detail = 'Could not read Firestore tokens: ' + e.message;
+    result.firestoreToken.detail = 'Waiting for token step to pass.';
   }
 
   return result;
