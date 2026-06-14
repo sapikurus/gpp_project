@@ -86,7 +86,7 @@ export default function PurchaseOrder() {
         await sendApprovalEmail(appData?.settings, {
           to: approvers.all,
           subject: `[GPP Portal] PO ${po.docNumber} Awaiting Approval`,
-          body: `Purchase Order ${po.docNumber} has been submitted for approval.\n\nVendor: ${po.vendorName||'–'}\nTotal: ${fmtTotal}\nApproval required: ${approvalLabel}\nSubmitted by: ${user.email}\n\nOpen in app: https://app.globalpetro.co.id/purchase-order`,
+          body: `Purchase Order ${po.docNumber} has been submitted for approval.\n\nVendor: ${po.vendorName||'–'}\nTotal: ${fmtTotal}\nApproval required: ${approvalLabel}\nSubmitted by: ${user.email}\n\nOpen in app: https://gpp.globalpetro.co.id/purchase-order`,
         });
         await requestPushNotification({
           title: `📋 PO Awaiting Approval`,
@@ -115,7 +115,7 @@ export default function PurchaseOrder() {
           if (toList.length) await sendApprovalEmail(appData?.settings, {
             to: toList,
             subject: `[GPP Portal] PO ${po.docNumber} — Approved ✅`,
-            body: `Your Purchase Order ${po.docNumber} has been fully approved.\n\nVendor: ${po.vendorName||'–'}\nTotal: ${new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(po.totalOrder||0)}\n\nOpen in app: https://app.globalpetro.co.id/purchase-order`,
+            body: `Your Purchase Order ${po.docNumber} has been fully approved.\n\nVendor: ${po.vendorName||'–'}\nTotal: ${new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(po.totalOrder||0)}\n\nOpen in app: https://gpp.globalpetro.co.id/purchase-order`,
           });
         } catch(e) {}
       } else if (next === 'pending_director') {
@@ -126,7 +126,7 @@ export default function PurchaseOrder() {
           await sendApprovalEmail(appData?.settings, {
             to: toList,
             subject: `[GPP Portal] PO ${po.docNumber} — Awaiting Director Approval`,
-            body: `Purchase Order ${po.docNumber} has been approved by the Manager and now requires Director approval.\n\nVendor: ${po.vendorName||'–'}\nTotal: ${new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(po.totalOrder||0)}\n\nOpen in app: https://app.globalpetro.co.id/purchase-order`,
+            body: `Purchase Order ${po.docNumber} has been approved by the Manager and now requires Director approval.\n\nVendor: ${po.vendorName||'–'}\nTotal: ${new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(po.totalOrder||0)}\n\nOpen in app: https://gpp.globalpetro.co.id/purchase-order`,
           });
         } catch(e) {}
       }
@@ -145,7 +145,7 @@ export default function PurchaseOrder() {
         if (submitterEmail) await sendApprovalEmail(appData?.settings, {
           to: [submitterEmail],
           subject: `[GPP Portal] PO ${po.docNumber} — Rejected ❌`,
-          body: `Your Purchase Order ${po.docNumber} has been rejected.\n\nVendor: ${po.vendorName||'–'}\nRejection reason: ${note || '(no reason provided)'}\nRejected by: ${user.email}\n\nPlease correct and resubmit. Open in app: https://app.globalpetro.co.id/purchase-order`,
+          body: `Your Purchase Order ${po.docNumber} has been rejected.\n\nVendor: ${po.vendorName||'–'}\nRejection reason: ${note || '(no reason provided)'}\nRejected by: ${user.email}\n\nPlease correct and resubmit. Open in app: https://gpp.globalpetro.co.id/purchase-order`,
         });
       } catch(e) {}
       setPOs(await fetchCollection(POS_REF())); setShowApproval(null);

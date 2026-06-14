@@ -829,6 +829,10 @@ function Settings() {
   const [emailEndpoint, setEmailEndpoint] = useState(appData?.settings?.emailEndpoint || '');
   const [savingEmailEP, setSavingEmailEP] = useState(false);
   const [savedEmailEP, setSavedEmailEP]   = useState(false);
+  const [resendKey,    setResendKey]    = useState(appData?.settings?.resendApiKey || '');
+  const [resendFrom,   setResendFrom]   = useState(appData?.settings?.emailFrom || '');
+  const [savingResend, setSavingResend] = useState(false);
+  const [savedResend,  setSavedResend]  = useState(false);
   const [poThreshold, setPoThreshold] = useState(
     appData?.settings?.poApprovalThreshold != null
       ? String(appData.settings.poApprovalThreshold)
@@ -922,6 +926,7 @@ function Settings() {
   const saveChain = async () => { setSavingChain(true); try{await patchField('settings',{...(appData?.settings||{}),approvalChain:chains});await reload();setSavedChain(true);setTimeout(()=>setSavedChain(false),2500);}finally{setSavingChain(false);} };
   const saveEndpoint = async () => { setSavingEP(true); try{await patchField('settings',{...(appData?.settings||{}),mopsEndpoint:endpoint});await reload();setSavedEP(true);setTimeout(()=>setSavedEP(false),2500);}finally{setSavingEP(false);} };
   const saveEmailEndpoint = async () => { setSavingEmailEP(true); try{await patchField('settings',{...(appData?.settings||{}),emailEndpoint:emailEndpoint.trim()});await reload();setSavedEmailEP(true);setTimeout(()=>setSavedEmailEP(false),2500);}finally{setSavingEmailEP(false);} };
+  const saveResend = async () => { setSavingResend(true); try{await patchField('settings',{...(appData?.settings||{}),resendApiKey:resendKey.trim(),emailFrom:resendFrom.trim()});await reload();setSavedResend(true);setTimeout(()=>setSavedResend(false),2500);}finally{setSavingResend(false);} };
   const saveThreshold = async () => { setSavingThreshold(true); try{await patchField('settings',{...(appData?.settings||{}),poApprovalThreshold:parseFloat(poThreshold)||5000000000});await reload();setSavedThreshold(true);setTimeout(()=>setSavedThreshold(false),2500);}finally{setSavingThreshold(false);} };
   const doExport = async () => { setExporting(true); try{const data=await exportBackup();const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`gpp-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(url);setMsg('✅ Backup berhasil diunduh.');}catch(e){setMsg('❌ Export gagal: '+e.message);}finally{setExporting(false);setTimeout(()=>setMsg(''),4000);} };
   const doImport = async (e) => { const file=e.target.files[0];if(!file)return;if(!confirm('Restore backup ini?'))return;setImporting(true);try{const json=JSON.parse(await file.text());await importBackup(json);await reload();setMsg('✅ Restore berhasil.');}catch(err){setMsg('❌ Import gagal: '+err.message);}finally{setImporting(false);e.target.value='';setTimeout(()=>setMsg(''),4000);} };
@@ -987,24 +992,47 @@ function Settings() {
         {endpoint && <p className="text-xs text-green-600 mt-2">✅ MOPS endpoint configured</p>}
       </Card>
 
-      <Card title="📧 Email Notification Endpoint">
-        <p className="text-xs text-gray-400 mb-2">
-          Google Apps Script URL for sending approval email notifications. When a PO or SO is submitted,
-          emails are sent simultaneously to all Managers and Directors.
+      <Card title="📧 Email Notifications — Resend API">
+        <p className="text-xs text-gray-400 mb-3">
+          <b>Recommended.</b> Resend sends emails directly from the app — no Google account or GAS script needed.
+          Free tier: 100 emails/day. Sign up at <b>resend.com</b>, get an API key, paste it below.
         </p>
-        <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-3 text-xs text-blue-700">
-          <p className="font-semibold mb-1">GAS script — add this handler to your existing doGet() function:</p>
-          <pre className="font-mono whitespace-pre-wrap text-[10px] leading-relaxed bg-white rounded p-2 border border-blue-100">{`if (e.parameter.action === 'email') {
-  const to      = e.parameter.to || '';
-  const subject = e.parameter.subject || 'GPP Portal';
-  const body    = e.parameter.body || '';
-  MailApp.sendEmail(to, subject, body);
-  return ContentService
-    .createTextOutput(JSON.stringify({ success: true }))
-    .setMimeType(ContentService.MimeType.JSON);
-}`}</pre>
-          <p className="mt-2">Re-deploy the GAS script as a Web App after adding this code. The URL is the same — paste it below.</p>
+        <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 mb-4 text-xs text-blue-700 space-y-1">
+          <p><b>Setup (5 minutes):</b></p>
+          <p>1. Go to <b>resend.com</b> → Sign Up (free) → API Keys → Create API Key</p>
+          <p>2. Paste the key below and save</p>
+          <p>3. Optional: add your domain in Resend → Domains → verify DNS records → then set "From" email to <code>noreply@globalpetro.co.id</code></p>
+          <p>4. Without domain verification, emails send from <code>onboarding@resend.dev</code> — fully functional for internal use</p>
         </div>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1">Resend API Key</label>
+            <div className="flex gap-2">
+              <input type="password" value={resendKey} onChange={e=>setResendKey(e.target.value)}
+                placeholder="re_xxxxxxxxxxxxxxxxxxxxxxxx"
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 font-mono text-xs"/>
+              <button onClick={saveResend} disabled={savingResend}
+                className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-60 shrink-0">
+                {savingResend ? '⏳' : savedResend ? '✅' : '💾'}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1">From Address (optional)</label>
+            <input type="text" value={resendFrom} onChange={e=>setResendFrom(e.target.value)}
+              placeholder="GPP Portal <noreply@globalpetro.co.id>"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 font-mono text-xs"/>
+            <p className="text-[10px] text-gray-400 mt-0.5">Leave blank to use Resend's default sender. Only fill this after verifying your domain in Resend.</p>
+          </div>
+        </div>
+        {resendKey && <p className="text-xs text-green-600 mt-3">✅ Resend API key configured</p>}
+        {!resendKey && <p className="text-xs text-amber-600 mt-3">⚠ Not configured — approval emails will not be sent</p>}
+      </Card>
+
+      <Card title="📧 Email Notifications — GAS (alternative)">
+        <p className="text-xs text-gray-400 mb-3">
+          Use this only if you prefer Google Apps Script. If Resend API key is set above, it takes priority over this.
+        </p>
         <div className="flex gap-2">
           <input type="text" value={emailEndpoint} onChange={e=>setEmailEndpoint(e.target.value)}
             placeholder="https://script.google.com/macros/s/..."
@@ -1014,8 +1042,7 @@ function Settings() {
             {savingEmailEP ? '⏳' : savedEmailEP ? '✅' : '💾'}
           </button>
         </div>
-        {emailEndpoint && <p className="text-xs text-green-600 mt-2">✅ Email endpoint configured</p>}
-        {!emailEndpoint && <p className="text-xs text-amber-600 mt-2">⚠ Not configured — approval notifications will not be sent</p>}
+        {emailEndpoint && <p className="text-xs text-green-600 mt-2">✅ GAS endpoint configured</p>}
       </Card>
 
       <Card title="💰 PO Approval Threshold">

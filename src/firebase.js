@@ -44,35 +44,48 @@ const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || '';
 const FCM_TOKENS_COL = 'fcm_tokens';
 const NOTIF_REQUESTS_COL = 'notification_requests';
 
-// Request push permission and get/save the device token
+// Request push permission, register SW, get token, save to Firestore.
+// Returns { ok, step, error } so callers can show accurate feedback.
 export async function initPushNotifications(userEmail, userRole) {
-  if (!VAPID_KEY || !('Notification' in window) || !('serviceWorker' in navigator)) return;
+  const fail = (step, msg) => ({ ok: false, step, error: msg });
+  if (!VAPID_KEY)               return fail('vapid',  'VAPID key not configured in build.');
+  if (!('Notification' in window)) return fail('support','Browser does not support notifications.');
+  if (!('serviceWorker' in navigator)) return fail('support','Browser does not support service workers.');
+
   try {
     const permission = await Notification.requestPermission();
-    if (permission !== 'granted') return;
-    // Explicitly register the FCM service worker (don't rely on ready which may return a different SW)
+    if (permission !== 'granted') return fail('permission', 'Permission ' + permission);
+
+    // Explicitly register firebase-messaging-sw.js
     const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
-    // Wait for it to become active
     await new Promise(resolve => {
       if (swReg.active) { resolve(); return; }
       const sw = swReg.installing || swReg.waiting;
-      if (sw) { sw.addEventListener('statechange', e => { if (e.target.state === 'activated') resolve(); }); }
-      else setTimeout(resolve, 2000); // fallback
+      if (sw) sw.addEventListener('statechange', e => { if (e.target.state === 'activated') resolve(); });
+      else setTimeout(resolve, 2000);
     });
+
     const token = await getToken(getMsg(), { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
-    if (!token) return;
+    if (!token) return fail('token', 'getToken() returned null — check VAPID key.');
+
+    // Save token to Firestore — let this throw if permissions are wrong
     const key = userEmail.replace(/\./g, '_');
     await setDoc(doc(db, FCM_TOKENS_COL, key), {
       token, email: userEmail, role: userRole, updatedAt: Date.now(),
     });
-    // Listen for foreground messages and show browser notification
-    onMessage(getMsg(), payload => {
-      const { title, body } = payload.notification || {};
-      if (!title) return;
-      new Notification(title, { body, icon: '/favicon.png' });
-    });
-  } catch (e) {
-    console.warn('FCM init failed (non-blocking):', e.message);
+
+    // Listen for foreground messages
+    try {
+      onMessage(getMsg(), payload => {
+        const { title, body } = payload.notification || {};
+        if (title) new Notification(title, { body, icon: '/favicon.png' });
+      });
+    } catch {} // Non-critical
+
+    return { ok: true };
+  } catch(e) {
+    console.warn('FCM init:', e.message);
+    return fail('unknown', e.message);
   }
 }
 
@@ -238,21 +251,49 @@ export async function getApproverEmails() {
   return { managers, directors, all: [...new Set([...managers, ...directors])] };
 }
 
-// Send notification via the configured GAS email endpoint
+// Send notification email via Resend API or GAS endpoint (whichever is configured)
 // Fails silently — never blocks the approval flow
 export async function sendApprovalEmail(settings, { to, subject, body }) {
+  if (!to?.length) return;
+  const toList = Array.isArray(to) ? to : [to];
+
+  // ── Option A: Resend API (preferred — no Google account needed) ──────────────
+  const resendKey = settings?.resendApiKey;
+  if (resendKey) {
+    try {
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: settings?.emailFrom || 'GPP Portal <onboarding@resend.dev>',
+          to:   toList,
+          subject,
+          text: body,
+          html: `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#374151">
+            <div style="background:#1e3a8a;padding:16px 24px;border-radius:8px 8px 0 0">
+              <h2 style="color:white;margin:0;font-size:16px">GPP Portal — PT Global Petro Pasifik</h2>
+            </div>
+            <div style="background:#f9fafb;padding:20px 24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px">
+              <pre style="white-space:pre-wrap;font-family:inherit;font-size:13px">${body}</pre>
+            </div>
+            <p style="font-size:11px;color:#9ca3af;margin-top:12px">GPP Portal — gpp.globalpetro.co.id</p>
+          </div>`,
+        }),
+      });
+    } catch(e) { console.warn('Resend email failed:', e.message); }
+    return;
+  }
+
+  // ── Option B: GAS endpoint (fallback) ────────────────────────────────────────
   const endpoint = settings?.emailEndpoint;
-  if (!endpoint || !to?.length) return;
-  try {
-    const params = new URLSearchParams({
-      action:  'email',
-      to:      to.join(','),
-      subject,
-      body,
-    });
-    await fetch(`${endpoint}?${params.toString()}`);
-  } catch (e) {
-    console.warn('Email notification failed (non-blocking):', e.message);
+  if (endpoint) {
+    try {
+      const params = new URLSearchParams({ action:'email', to:toList.join(','), subject, body });
+      await fetch(`${endpoint}?${params.toString()}`);
+    } catch(e) { console.warn('GAS email failed:', e.message); }
   }
 }
 export async function getUserRole(email) {

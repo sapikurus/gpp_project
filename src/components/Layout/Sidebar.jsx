@@ -23,21 +23,30 @@ export default function Sidebar() {
   const [pwError, setPwError] = useState('');
   const [pwSaving, setPwSaving] = useState(false);
   const [pwDone,   setPwDone]   = useState(false);
-  const [notifState, setNotifState] = useState('idle'); // idle | loading | ok | denied | error
+  const [notifState,  setNotifState]  = useState('idle'); // idle | loading | ok | denied | error
+  const [notifDetail, setNotifDetail] = useState('');
 
   const registerNotifications = async () => {
-    setNotifState('loading');
+    setNotifState('loading'); setNotifDetail('');
     try {
-      if (!('Notification' in window)) { setNotifState('error'); return; }
-      const perm = await Notification.requestPermission();
-      if (perm === 'denied') { setNotifState('denied'); setTimeout(() => setNotifState('idle'), 4000); return; }
-      await initPushNotifications(user?.email, userRole);
-      setNotifState('ok');
-      setTimeout(() => setNotifState('idle'), 4000);
+      if (!('Notification' in window)) { setNotifState('error'); setNotifDetail('Browser not supported'); return; }
+      const result = await initPushNotifications(user?.email, userRole);
+      if (result.ok) {
+        setNotifState('ok');
+        setNotifDetail('');
+        setTimeout(() => setNotifState('idle'), 5000);
+      } else if (result.step === 'permission') {
+        setNotifState('denied');
+        setNotifDetail('Go to browser settings and allow notifications for this site');
+        setTimeout(() => { setNotifState('idle'); setNotifDetail(''); }, 6000);
+      } else {
+        setNotifState('error');
+        setNotifDetail(result.error || 'Unknown error');
+        setTimeout(() => { setNotifState('idle'); setNotifDetail(''); }, 6000);
+      }
     } catch(e) {
-      console.warn('Notification registration:', e.message);
-      setNotifState('error');
-      setTimeout(() => setNotifState('idle'), 4000);
+      setNotifState('error'); setNotifDetail(e.message);
+      setTimeout(() => { setNotifState('idle'); setNotifDetail(''); }, 6000);
     }
   };
 
@@ -159,13 +168,13 @@ export default function Sidebar() {
 
         {/* Notification registration — visible to all users */}
         <button onClick={registerNotifications} disabled={notifState === 'loading'}
-          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors ${
-            notifState === 'ok'     ? 'text-green-300 hover:bg-blue-800' :
-            notifState === 'denied' ? 'text-red-300 hover:bg-blue-800'  :
-            notifState === 'error'  ? 'text-amber-300 hover:bg-blue-800':
+          className={`w-full flex items-start gap-2 px-3 py-2 rounded-lg text-xs transition-colors ${
+            notifState === 'ok'     ? 'text-green-300 bg-blue-800' :
+            notifState === 'denied' ? 'text-red-300 bg-blue-800'  :
+            notifState === 'error'  ? 'text-amber-300 bg-blue-800':
                                       'text-blue-200 hover:bg-blue-800 hover:text-white'
           }`}>
-          <span>
+          <span className="shrink-0 mt-0.5">
             {notifState === 'loading' ? '⏳' :
              notifState === 'ok'      ? '✅' :
              notifState === 'denied'  ? '🚫' :
@@ -174,8 +183,8 @@ export default function Sidebar() {
           <span>
             {notifState === 'loading' ? 'Registering…' :
              notifState === 'ok'      ? 'Notifications enabled!' :
-             notifState === 'denied'  ? 'Permission denied — check browser settings' :
-             notifState === 'error'   ? 'Registration failed — try again' :
+             notifState === 'denied'  ? `Permission denied${notifDetail ? ' — ' + notifDetail : ''}` :
+             notifState === 'error'   ? `Failed${notifDetail ? ': ' + notifDetail : ''}` :
                                         'Enable Notifications'}
           </span>
         </button>

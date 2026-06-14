@@ -116,7 +116,7 @@ export default function SalesOrder() {
         await sendApprovalEmail(appData?.settings, {
           to: approvers.all,
           subject: `[GPP Portal] SO ${so.docNumber} Awaiting Approval`,
-          body: `Sales Order ${so.docNumber} has been submitted for approval.\n\nClient: ${so.clientName||'–'}\nVolume: ${volTxt}\nSubmitted by: ${user.email}\n\nOpen in app: https://app.globalpetro.co.id/sales-order`,
+          body: `Sales Order ${so.docNumber} has been submitted for approval.\n\nClient: ${so.clientName||'–'}\nVolume: ${volTxt}\nSubmitted by: ${user.email}\n\nOpen in app: https://gpp.globalpetro.co.id/sales-order`,
         });
         await requestPushNotification({
           title: `🤝 SO Awaiting Approval`,
@@ -143,7 +143,7 @@ export default function SalesOrder() {
           if (submitterEmail) await sendApprovalEmail(appData?.settings, {
             to: [submitterEmail],
             subject: `[GPP Portal] SO ${so.docNumber} — Approved ✅`,
-            body: `Your Sales Order ${so.docNumber} has been fully approved.\n\nClient: ${so.clientName||'–'}\nVolume: ${so.volume ? Number(so.volume).toLocaleString('id-ID')+' L' : '–'}\n\nStock has been deducted accordingly.\nOpen in app: https://app.globalpetro.co.id/sales-order`,
+            body: `Your Sales Order ${so.docNumber} has been fully approved.\n\nClient: ${so.clientName||'–'}\nVolume: ${so.volume ? Number(so.volume).toLocaleString('id-ID')+' L' : '–'}\n\nStock has been deducted accordingly.\nOpen in app: https://gpp.globalpetro.co.id/sales-order`,
           });
         } catch(e) {}
       } else {
@@ -159,7 +159,7 @@ export default function SalesOrder() {
             await sendApprovalEmail(appData?.settings, {
               to: toList,
               subject: `[GPP Portal] SO ${so.docNumber} — Awaiting Director Approval`,
-              body: `Sales Order ${so.docNumber} has been approved by the Manager and requires Director approval.\n\nClient: ${so.clientName||'–'}\nVolume: ${so.volume ? Number(so.volume).toLocaleString('id-ID')+' L' : '–'}\n\nOpen in app: https://app.globalpetro.co.id/sales-order`,
+              body: `Sales Order ${so.docNumber} has been approved by the Manager and requires Director approval.\n\nClient: ${so.clientName||'–'}\nVolume: ${so.volume ? Number(so.volume).toLocaleString('id-ID')+' L' : '–'}\n\nOpen in app: https://gpp.globalpetro.co.id/sales-order`,
             });
           } catch(e) {}
         }
@@ -182,7 +182,7 @@ export default function SalesOrder() {
         if (submitterEmail) await sendApprovalEmail(appData?.settings, {
           to: [submitterEmail],
           subject: `[GPP Portal] SO ${so.docNumber} — Rejected ❌`,
-          body: `Your Sales Order ${so.docNumber} has been rejected.\n\nClient: ${so.clientName||'–'}\nRejection reason: ${note || '(no reason provided)'}\nRejected by: ${user.email}\n\nPlease correct and resubmit. Open in app: https://app.globalpetro.co.id/sales-order`,
+          body: `Your Sales Order ${so.docNumber} has been rejected.\n\nClient: ${so.clientName||'–'}\nRejection reason: ${note || '(no reason provided)'}\nRejected by: ${user.email}\n\nPlease correct and resubmit. Open in app: https://gpp.globalpetro.co.id/sales-order`,
         });
       } catch(e) {}
       setSOs(await fetchCollection(SOS_REF())); setShowDetail(null);
