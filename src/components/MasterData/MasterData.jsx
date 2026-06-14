@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { useApp } from '../../App.jsx';
-import { patchField, patchData, exportBackup, importBackup } from '../../firebase.js';
+import { patchField, patchData, exportBackup, importBackup, requestPushNotification } from '../../firebase.js';
 import * as XLSX from 'xlsx';
 
 const F = ({ label, value, onChange, type = 'text', placeholder = '', step }) => (
@@ -822,7 +822,7 @@ function Facilities() {
 }
 
 function Settings() {
-  const { appData, reload } = useApp();
+  const { appData, reload, userRole } = useApp();
   const [endpoint, setEndpoint] = useState(appData?.settings?.mopsEndpoint || '');
   const [savingEP, setSavingEP] = useState(false);
   const [savedEP, setSavedEP]   = useState(false);
@@ -838,6 +838,43 @@ function Settings() {
   const [savedThreshold, setSavedThreshold]   = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  // Notification state
+  const [notifTitle,  setNotifTitle]  = useState('');
+  const [notifBody,   setNotifBody]   = useState('');
+  const [notifTarget, setNotifTarget] = useState('all');
+  const [notifSending, setNotifSending] = useState(false);
+  const [notifResult,  setNotifResult]  = useState('');
+  const isDirector = userRole === 'director' || userRole === 'superadmin';
+
+  const sendTestNotif = async () => {
+    setNotifSending(true); setNotifResult('');
+    try {
+      await requestPushNotification({
+        title: '🔔 GPP Portal — Test Notification',
+        body: 'Push notification is working correctly. You will receive approval alerts here.',
+        url: '/',
+        targetRoles: ['staff','manager','director','superadmin'],
+      });
+      setNotifResult('✅ Test notification sent. It will arrive within a few seconds if FCM is configured.');
+    } catch(e) { setNotifResult('❌ Failed: ' + e.message); }
+    finally { setNotifSending(false); }
+  };
+
+  const sendCustomNotif = async () => {
+    if (!notifTitle.trim() || !notifBody.trim()) { setNotifResult('⚠ Please fill in both title and message.'); return; }
+    setNotifSending(true); setNotifResult('');
+    try {
+      const targetRoles = notifTarget === 'all'
+        ? ['staff','manager','director','superadmin']
+        : notifTarget === 'managers'
+        ? ['manager','director','superadmin']
+        : ['director','superadmin'];
+      await requestPushNotification({ title: notifTitle.trim(), body: notifBody.trim(), url: '/', targetRoles });
+      setNotifResult(`✅ Notification sent to ${notifTarget === 'all' ? 'all users' : notifTarget}.`);
+      setNotifTitle(''); setNotifBody('');
+    } catch(e) { setNotifResult('❌ Failed: ' + e.message); }
+    finally { setNotifSending(false); }
+  };
   const [msg, setMsg] = useState('');
   const [userRoles, setUserRoles] = useState(appData?.userRoles || {});
   const [newEmail, setNewEmail] = useState('');
@@ -988,6 +1025,76 @@ function Settings() {
           </span>
         </p>
       </Card>
+
+      {/* Push Notifications — Director / Super Admin only */}
+      {isDirector && (
+        <>
+          <Card title="🔔 Test Push Notification">
+            <p className="text-xs text-gray-400 mb-4">
+              Send a test push notification to all registered devices to verify FCM is configured and working.
+              All users who have accepted the notification permission will receive it.
+            </p>
+            <button onClick={sendTestNotif} disabled={notifSending}
+              className="bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-50">
+              {notifSending ? '⏳ Sending…' : '🔔 Send Test Notification'}
+            </button>
+            {notifResult && (
+              <p className={`mt-3 text-sm ${notifResult.startsWith('✅') ? 'text-green-700' : notifResult.startsWith('⚠') ? 'text-amber-700' : 'text-red-600'}`}>
+                {notifResult}
+              </p>
+            )}
+          </Card>
+
+          <Card title="📢 Custom Broadcast">
+            <p className="text-xs text-gray-400 mb-4">
+              Send a custom message to all app users or a specific group. Useful for announcements, reminders, or urgent alerts.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1">Notification Title</label>
+                <input type="text" value={notifTitle} onChange={e => setNotifTitle(e.target.value)}
+                  placeholder="e.g. System Update, Important Notice…"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  maxLength={64}/>
+                <p className="text-[10px] text-gray-400 mt-0.5">{notifTitle.length}/64</p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1">Message</label>
+                <textarea value={notifBody} onChange={e => setNotifBody(e.target.value)}
+                  placeholder="Type your message here…"
+                  rows={3}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
+                  maxLength={200}/>
+                <p className="text-[10px] text-gray-400 mt-0.5">{notifBody.length}/200</p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1">Send To</label>
+                <div className="flex gap-2">
+                  {[['all','All Users'],['managers','Managers & Directors'],['directors','Directors Only']].map(([val, label]) => (
+                    <button key={val} onClick={() => setNotifTarget(val)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                        notifTarget === val
+                          ? 'bg-blue-700 text-white border-blue-700'
+                          : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+                      }`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button onClick={sendCustomNotif} disabled={notifSending || !notifTitle.trim() || !notifBody.trim()}
+                className="w-full bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-50">
+                {notifSending ? '⏳ Sending…' : '📢 Send Broadcast'}
+              </button>
+              {notifResult && (
+                <p className={`text-sm ${notifResult.startsWith('✅') ? 'text-green-700' : notifResult.startsWith('⚠') ? 'text-amber-700' : 'text-red-600'}`}>
+                  {notifResult}
+                </p>
+              )}
+            </div>
+          </Card>
+        </>
+      )}
 
       <Card title="💾 Backup & Restore">
         <div className="space-y-4">
