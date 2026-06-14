@@ -5,7 +5,7 @@ import {
   fetchCollection, createNumberedDoc, updateSubDoc, deleteSubDoc,
   STOCKS_REF, POS_REF,
 } from '../../firebase.js';
-import { today, formatIDR, formatDateShort, daysBetween, INDO_MONTHS } from '../../utils/utils.js';
+import { today, formatIDR, formatDateShort, daysBetween, INDO_MONTHS , fmtDate} from '../../utils/utils.js';
 import { canDelete } from '../../utils/approvalUtils.js';
 
 // ─── Calculation helpers ──────────────────────────────────────────────────────
@@ -148,7 +148,7 @@ function TrancheModal({ tranche, rates, provs, pos, onSave, onClose }) {
                 setT(p => ({ ...p, linkedPoId: e.target.value, linkedPoNumber: po?.docNumber || '' }));
               }}>
               <option value="">— Tidak ada (modeling saja) —</option>
-              {pos.map(po => <option key={po.id} value={po.id}>{po.docNumber} · {po.vendorName || '-'} · {po.poDate}</option>)}
+              {pos.map(po => <option key={po.id} value={po.id}>{po.docNumber} · {po.vendorName || '-'} · {fmtDate(po.poDate)}</option>)}
             </select>
 
             {linkedPO && (
@@ -489,7 +489,7 @@ export default function Stok() {
                         className={`flex items-center justify-between border rounded-lg px-4 py-3 ${linked?'bg-green-50 border-green-200':'hover:border-blue-300 cursor-pointer'}`}>
                         <div>
                           <p className="text-sm font-mono font-semibold text-blue-700">{po.docNumber}</p>
-                          <p className="text-xs text-gray-500">{po.vendorName||'-'} · {po.poDate}</p>
+                          <p className="text-xs text-gray-500">{po.vendorName||'-'} · {fmtDate(po.poDate)}</p>
                         </div>
                         {linked ? <span className="text-xs text-green-600 font-semibold">✓ Terhubung</span>
                                 : <span className="text-xs text-blue-600">+ Hubungkan</span>}
@@ -851,6 +851,76 @@ function EndCycleModal({ stock, tranches, rates, provs, onClose, onConfirm }) {
               New cycle tranche has <b>no taxes applied</b> — all taxes were already included in the original tranche costs. This prevents double taxation on the rolled-over inventory.
             </p>
           </div>
+
+          {/* Historical — Supply Tranches */}
+          <div className="border-t pt-4">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">📦 Historical — Supply Tranches</p>
+            <div className="bg-gray-50 rounded-xl overflow-hidden">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-100"><tr>
+                  {['Supplier','Vessel','Base Price','Volume (L)','Load Date','Modal/L'].map(h=>(
+                    <th key={h} className="text-left px-3 py-2 font-semibold text-gray-500">{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody className="divide-y divide-gray-200">
+                  {tranches.map((t,i)=>{
+                    const base=parseFloat(t.basePrice)||0, vol=parseFloat(t.vol)||0;
+                    const bphR=(parseFloat(rates?.bphMigas)||0)/100;
+                    const prov=provs?.find(p=>p.name===t.pbbkbProvince);
+                    const pbR=(t.applyPBBKB&&!t.noPbbkb)?(parseFloat(prov?.rate)||0)/100:0;
+                    const eff=base+base*pbR+(t.applyBPHBuy?base*bphR:0);
+                    return (
+                      <tr key={i} className={i%2===0?'bg-white':''}>
+                        <td className="px-3 py-2">{t.supplier||'–'}</td>
+                        <td className="px-3 py-2 text-gray-400">{t.vessel||'–'}</td>
+                        <td className="px-3 py-2 font-mono">{Number(base).toLocaleString('id-ID')}</td>
+                        <td className="px-3 py-2 font-mono">{Number(vol).toLocaleString('id-ID')}</td>
+                        <td className="px-3 py-2">{t.loadDate||'–'}</td>
+                        <td className="px-3 py-2 font-mono font-semibold text-blue-700">{fmt(eff)}</td>
+                      </tr>
+                    );
+                  })}
+                  <tr className="bg-blue-50 font-semibold">
+                    <td colSpan={3} className="px-3 py-2 text-blue-700 text-xs">Blended (volume-weighted)</td>
+                    <td className="px-3 py-2 font-mono">{fmtV(totalVol)}</td>
+                    <td/>
+                    <td className="px-3 py-2 font-mono text-blue-700">{fmt(blendedModal)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Historical — Sales Orders */}
+          {soDeduction > 0 && (
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">🤝 Historical — Sales Orders Committed</p>
+              <div className="bg-gray-50 rounded-xl overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-100"><tr>
+                    {['SO Number','Client','Volume (L)','Price/L','Status'].map(h=>(
+                      <th key={h} className="text-left px-3 py-2 font-semibold text-gray-500">{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {(stock.linkedSOs||[]).length === 0 ? (
+                      <tr><td colSpan={5} className="px-3 py-3 text-gray-400 italic">
+                        Committed volume: {fmtV(soDeduction)} L (detail not available — loaded from stock committedVolume)
+                      </td></tr>
+                    ) : (stock.linkedSOs||[]).map((so,i)=>(
+                      <tr key={i} className={i%2===0?'bg-white':''}>
+                        <td className="px-3 py-2 font-mono text-blue-600">{so.docNumber||'–'}</td>
+                        <td className="px-3 py-2">{so.clientName||'–'}</td>
+                        <td className="px-3 py-2 font-mono">{Number(so.volume||0).toLocaleString('id-ID')}</td>
+                        <td className="px-3 py-2 font-mono">{so.agreedPrice ? Number(so.agreedPrice).toLocaleString('id-ID') : '–'}</td>
+                        <td className="px-3 py-2"><span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-[10px] font-semibold">{so.approvalStatus||'–'}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex gap-3 p-5 border-t">
           <button onClick={handleConfirm} disabled={saving||remaining<=0}

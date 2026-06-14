@@ -710,47 +710,110 @@ function Products() {
 function Facilities() {
   const { appData, reload } = useApp();
   const TYPES = ['SPOB','Kapal Tanker','Truk Tangki','Storage Tank','Lainnya'];
-  const [items, setItems] = useState(appData?.facilities || []);
+  const BLANK = { facilityId:'', name:'', type:'SPOB', capacity:'', notes:'' };
+  const [items,   setItems]   = useState(appData?.facilities || []);
+  const [editing, setEditing] = useState(null); // id of row being edited
+  const [editRow, setEditRow] = useState(null); // copy of row data
+  const [row, setRow] = useState(BLANK);
   const { save, saving, saved } = useSave('facilities', () => items, reload, appData);
   useEffect(() => { if (appData?.facilities) setItems(appData.facilities); }, [appData]);
+
   const genId = () => `GPP-${String(items.length+1).padStart(3,'0')}`;
-  const [row, setRow] = useState({ facilityId: genId(), name:'', type:'SPOB', capacity:'', notes:'' });
-  const add = () => { if(!row.name)return; setItems(p=>[...p,{...row,id:Date.now().toString()}]); setRow(r=>({...r,facilityId:genId(),name:'',capacity:'',notes:''})); };
-  const del = i => setItems(p=>p.filter((_,idx)=>idx!==i));
-  const upd = (i,k,v) => setItems(p=>p.map((x,idx)=>idx===i?{...x,[k]:v}:x));
+  const add = () => {
+    if (!row.name) return;
+    setItems(p => [...p, { ...row, id: Date.now().toString() }]);
+    setRow({ ...BLANK, facilityId: genId() });
+  };
+  const del = (id) => { if (!confirm('Hapus fasilitas ini?')) return; setItems(p => p.filter(x => x.id !== id)); };
+  const startEdit = (item) => { setEditing(item.id); setEditRow({ ...item }); };
+  const cancelEdit = () => { setEditing(null); setEditRow(null); };
+  const saveEdit = () => {
+    setItems(p => p.map(x => x.id === editing ? { ...editRow } : x));
+    setEditing(null); setEditRow(null);
+  };
+
+  const IF = 'w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300';
+
   return (
     <div><SaveBtn onSave={save} saving={saving} saved={saved} />
       <Card title="🚢 Facilities">
-        <p className="text-xs text-gray-400 mb-3">ID bisa diedit sesuai nomor registrasi internal GPP.</p>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
-          {[['facilityId','Facility ID','text'],['name','Nama','text'],['capacity','Kapasitas (L)','number']].map(([k,l,t])=>(
+        <p className="text-xs text-gray-400 mb-3">Fleet and storage assets. Click ✎ to edit an entry.</p>
+
+        {/* Add new row */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4 p-3 bg-gray-50 rounded-xl border border-gray-200">
+          <p className="col-span-full text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Add New Facility</p>
+          {[['facilityId','Facility ID','text'],['name','Name *','text'],['capacity','Capacity (L)','number']].map(([k,l,t])=>(
             <div key={k}><label className="block text-xs text-gray-500 mb-1">{l}</label>
-              <input type={t} value={row[k]||''} onChange={e=>setRow(p=>({...p,[k]:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"/></div>
+              <input type={t} value={row[k]||''} onChange={e=>setRow(p=>({...p,[k]:e.target.value}))}
+                placeholder={k==='facilityId'?genId():''} className={IF}/></div>
           ))}
-          <div><label className="block text-xs text-gray-500 mb-1">Tipe</label>
-            <select value={row.type} onChange={e=>setRow(p=>({...p,type:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
-              {TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
-          <div><label className="block text-xs text-gray-500 mb-1">Catatan</label>
-            <input type="text" value={row.notes||''} onChange={e=>setRow(p=>({...p,notes:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"/></div>
-          <div className="flex items-end"><button onClick={add} className="w-full bg-blue-700 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-800">+ Tambah</button></div>
+          <div><label className="block text-xs text-gray-500 mb-1">Type</label>
+            <select value={row.type} onChange={e=>setRow(p=>({...p,type:e.target.value}))} className={IF}>
+              {TYPES.map(t=><option key={t}>{t}</option>)}</select></div>
+          <div><label className="block text-xs text-gray-500 mb-1">Notes</label>
+            <input type="text" value={row.notes||''} onChange={e=>setRow(p=>({...p,notes:e.target.value}))} className={IF}/></div>
+          <div className="flex items-end">
+            <button onClick={add} disabled={!row.name}
+              className="w-full bg-blue-700 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-50">
+              + Add
+            </button>
+          </div>
         </div>
-        {items.length===0?<p className="text-gray-400 text-xs italic">Belum ada fasilitas.</p>:(
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <table className="w-full text-sm"><thead className="bg-gray-50"><tr>
-              {['ID','Nama','Tipe','Kapasitas','Catatan',''].map(h=><th key={h} className="text-left px-3 py-2 text-xs text-gray-500 font-medium">{h}</th>)}
-            </tr></thead>
-            <tbody className="divide-y divide-gray-100">
-              {items.map((item,i)=>(
-                <tr key={item.id||i} className="hover:bg-gray-50">
-                  <td className="px-3 py-2"><input type="text" value={item.facilityId||''} onChange={e=>upd(i,'facilityId',e.target.value)} className="font-mono text-xs border-b border-gray-300 focus:outline-none focus:border-blue-400 bg-transparent w-24"/></td>
-                  <td className="px-3 py-2 font-medium text-gray-800">{item.name}</td>
-                  <td className="px-3 py-2 text-gray-600 text-xs">{item.type}</td>
-                  <td className="px-3 py-2 text-gray-600 text-xs">{item.capacity?Number(item.capacity).toLocaleString('id-ID')+' L':'-'}</td>
-                  <td className="px-3 py-2 text-gray-400 text-xs">{item.notes||'-'}</td>
-                  <td className="px-3 py-2"><button onClick={()=>del(i)} className="text-red-400 hover:text-red-600 text-xs">✕</button></td>
-                </tr>
-              ))}
-            </tbody></table>
+
+        {/* Table */}
+        {items.length === 0
+          ? <p className="text-gray-400 text-xs italic text-center py-6">No facilities yet.</p>
+          : (
+          <div className="border border-gray-200 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>{['ID','Name','Type','Capacity','Notes','Actions'].map(h=>(
+                  <th key={h} className="text-left px-3 py-2.5 text-xs font-semibold text-gray-500">{h}</th>
+                ))}</tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {items.map(item => {
+                  const isEditingThis = editing === item.id;
+                  return (
+                    <tr key={item.id} className={isEditingThis ? 'bg-blue-50' : 'hover:bg-gray-50'}>
+                      {isEditingThis ? (
+                        <>
+                          <td className="px-2 py-2"><input value={editRow.facilityId||''} onChange={e=>setEditRow(p=>({...p,facilityId:e.target.value}))} className={IF+' w-24'}/></td>
+                          <td className="px-2 py-2"><input value={editRow.name||''} onChange={e=>setEditRow(p=>({...p,name:e.target.value}))} className={IF}/></td>
+                          <td className="px-2 py-2">
+                            <select value={editRow.type||'SPOB'} onChange={e=>setEditRow(p=>({...p,type:e.target.value}))} className={IF+' w-32'}>
+                              {TYPES.map(t=><option key={t}>{t}</option>)}
+                            </select>
+                          </td>
+                          <td className="px-2 py-2"><input type="number" value={editRow.capacity||''} onChange={e=>setEditRow(p=>({...p,capacity:e.target.value}))} className={IF+' w-28'}/></td>
+                          <td className="px-2 py-2"><input value={editRow.notes||''} onChange={e=>setEditRow(p=>({...p,notes:e.target.value}))} className={IF}/></td>
+                          <td className="px-2 py-2">
+                            <div className="flex gap-1">
+                              <button onClick={saveEdit} className="text-xs bg-blue-700 text-white px-2.5 py-1 rounded-lg hover:bg-blue-800 font-semibold">✓ Save</button>
+                              <button onClick={cancelEdit} className="text-xs border border-gray-200 px-2.5 py-1 rounded-lg hover:bg-gray-50">✕</button>
+                            </div>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="px-3 py-2.5 font-mono text-xs text-blue-600">{item.facilityId||'–'}</td>
+                          <td className="px-3 py-2.5 font-semibold text-gray-800">{item.name}</td>
+                          <td className="px-3 py-2.5 text-xs text-gray-500">{item.type}</td>
+                          <td className="px-3 py-2.5 text-xs text-gray-500">{item.capacity ? Number(item.capacity).toLocaleString('id-ID')+' L' : '–'}</td>
+                          <td className="px-3 py-2.5 text-xs text-gray-400">{item.notes||'–'}</td>
+                          <td className="px-3 py-2.5">
+                            <div className="flex gap-1.5">
+                              <button onClick={() => startEdit(item)} className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded hover:bg-blue-50 hover:text-blue-700">✎ Edit</button>
+                              <button onClick={() => del(item.id)} className="text-xs text-red-400 hover:text-red-600">✕</button>
+                            </div>
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </Card>

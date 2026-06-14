@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../../App.jsx';
 import { fetchCollection, createNumberedDoc, updateSubDoc, deleteSubDoc, POS_REF, getApproverEmails, sendApprovalEmail, getSubmitterEmail } from '../../firebase.js';
-import { formatIDR, formatDateID, buildPONumber, today, terbilang } from '../../utils/utils.js';
+import { formatIDR, formatDateID, buildPONumber, today, terbilang , fmtDate} from '../../utils/utils.js';
 import { getPOChain, firstPending, nextStatus, isEditable, isApproved, statusMeta, canDelete, DEFAULT_PO_THRESHOLD } from '../../utils/approvalUtils.js';
 import ApprovalPanel, { StatusBadge, DraftWatermark } from '../Layout/ApprovalPanel.jsx';
 import PrintWrapper from '../Layout/PrintWrapper.jsx';
@@ -298,7 +298,7 @@ export default function PurchaseOrder() {
                   return (
                     <tr key={po.id} className="hover:bg-gray-50 group">
                       <td className="px-4 py-3 font-mono font-semibold text-blue-600 text-xs whitespace-nowrap">{po.docNumber}</td>
-                      <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{po.poDate}</td>
+                      <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{fmtDate(po.poDate)}</td>
                       <td className="px-4 py-3 font-medium text-gray-700 max-w-[200px] truncate">{po.vendorName||'–'}</td>
                       <td className="px-4 py-3 font-mono text-gray-700">{formatIDR(po.totalOrder)}</td>
                       <td className="px-4 py-3"><span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${m.badge}`}>{m.label}</span></td>

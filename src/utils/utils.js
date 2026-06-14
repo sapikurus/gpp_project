@@ -35,8 +35,15 @@ export const INDO_MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','J
 export const toRoman       = (m) => ROM[m] || String(m);
 export const today         = () => new Date().toISOString().slice(0,10);
 export const daysBetween   = (a,b) => !a||!b ? 0 : Math.max(0, Math.round((new Date(b)-new Date(a))/86400000));
-export const formatDateID  = (s) => !s ? '' : new Date(s).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
-export const formatDateShort=(s) => !s ? '' : new Date(s).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
+export const formatDateID   = (s) => !s ? '' : new Date(s+'T12:00:00').toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
+export const formatDateShort= (s) => !s ? '' : new Date(s+'T12:00:00').toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
+// DD/MM/YYYY — used for all front-end date displays (tables, cards, badges)
+export const fmtDate = (s) => {
+  if (!s) return '–';
+  const d = new Date(s + 'T12:00:00');
+  if (isNaN(d)) return s;
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+};
 
 // Auto-fill bi-monthly Pertamina period based on today's date
 export const autoPeriod = () => {

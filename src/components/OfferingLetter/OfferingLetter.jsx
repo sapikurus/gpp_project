@@ -9,14 +9,13 @@ import {
 } from 'firebase/firestore';
 import {
   today, autoPeriod, buildSPHNumber, formatDateID,
-  terbilang, toRoman,
+  terbilang, toRoman, fmtDate,
 } from '../../utils/utils.js';
 import {
   getChain, firstPending, nextStatus,
   isEditable, isApproved, statusMeta, canDelete,
 } from '../../utils/approvalUtils.js';
 import ApprovalPanel, { StatusBadge, DraftWatermark } from '../Layout/ApprovalPanel.jsx';
-import PrintWrapper from '../Layout/PrintWrapper.jsx';
 import logo from '../../assets/gpp-logo.png';
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
@@ -54,13 +53,20 @@ const INIT = (nextSeq = 1) => ({
   province:         '',
   paymentMode:      'Credit',
   clientTOP:        45,
-  paymentOther:     '',
+  paymentOther:     '',          // free-text for custom payment terms
   product:          '',
   dpp:              '',
   pertaminaPrice:   '',
   applyPPN:         true,
   applyPPH:         false,
   applyPBBKB:       false,
+  // New fields
+  applyPPNOnOAT:    false,       // 5a — PPN on freight/OAT
+  showBankInfo:     true,        // 5b — show bank account in letter
+  minQtyEnabled:    false,       // 5c — minimum quantity toggle
+  minQty:           '',          // 5c — minimum quantity value (liters)
+  pbbkbIncludedNote: false,      // 5f — note: PBBKB sudah termasuk harga jual
+  //
   computerGenerated: false,
   lossRate:         0.3,
   revisionNo:       0,
@@ -78,7 +84,6 @@ export default function OfferingLetter() {
   const [loading,      setLoading]      = useState(true);
   const [view,         setView]         = useState('list'); // 'list' | 'form'
   const [showApproval, setShowApproval] = useState(null);
-  const [printing,     setPrinting]     = useState(null);
   const [form,         setForm]         = useState(null);
   const [editingId,    setEditingId]    = useState(null);
   const [saving,       setSaving]       = useState(false);
@@ -244,15 +249,16 @@ export default function OfferingLetter() {
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // RENDER: Print view
+  // Print in new window
   // ─────────────────────────────────────────────────────────────────────────────
-  if (printing) return (
-    <PrintWrapper onClose={() => setPrinting(null)}>
-      <DraftWatermark status={printing.approvalStatus} />
-      <OLPrint data={printing} company={co} rates={rates} provs={provs} />
-    </PrintWrapper>
-  );
-
+  const printInNewWindow = (ol, lang = 'id') => {
+    const html = generateOLHtml(ol, co, rates, provs, lang);
+    const win = window.open('', '_blank', 'width=960,height=800,scrollbars=yes');
+    if (!win) { alert('Pop-up blocked. Please allow pop-ups for this site.'); return; }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+  };
   // ─────────────────────────────────────────────────────────────────────────────
   // RENDER: Approval modal
   // ─────────────────────────────────────────────────────────────────────────────
@@ -415,23 +421,74 @@ export default function OfferingLetter() {
                     <option value="Credit">Credit (TOP in days)</option>
                     <option value="CBD">Cash Before Delivery (CBD)</option>
                     <option value="COD">Cash On Delivery (COD)</option>
-                    <option value="Other">Lainnya (input manual)</option>
+                    <option value="SKBDN">SKBDN / LC</option>
+                    <option value="DP">Downpayment (DP)</option>
+                    <option value="Other">Custom / Lainnya</option>
                   </select>
                 </div>
                 {form.paymentMode === 'Credit' && (
-                  <div>
-                    <Lbl>TOP (hari)</Lbl>
+                  <div><Lbl>TOP (hari setelah pengiriman)</Lbl>
                     <input type="number" value={form.clientTOP} onChange={e => set('clientTOP')(e.target.value)} className={inp}/>
                   </div>
                 )}
-                {form.paymentMode === 'Other' && (
-                  <div>
-                    <Lbl>Syarat Pembayaran</Lbl>
-                    <input type="text" value={form.paymentOther}
-                      onChange={e => set('paymentOther')(e.target.value)}
-                      className={inp} placeholder="e.g. DP 30%, sisa H+30 setelah pengiriman"/>
+                {form.paymentMode === 'DP' && (
+                  <div><Lbl>Detail Downpayment</Lbl>
+                    <input type="text" value={form.paymentOther||''} onChange={e => set('paymentOther')(e.target.value)}
+                      className={inp} placeholder="e.g. DP 30% di muka, sisa H+14 setelah pengiriman"/>
                   </div>
                 )}
+                {form.paymentMode === 'SKBDN' && (
+                  <div><Lbl>Detail SKBDN / LC</Lbl>
+                    <input type="text" value={form.paymentOther||''} onChange={e => set('paymentOther')(e.target.value)}
+                      className={inp} placeholder="e.g. SKBDN at sight, cover 100% nilai transaksi"/>
+                  </div>
+                )}
+                {form.paymentMode === 'Other' && (
+                  <div><Lbl>Syarat Pembayaran (bebas)</Lbl>
+                    <input type="text" value={form.paymentOther||''} onChange={e => set('paymentOther')(e.target.value)}
+                      className={inp} placeholder="Tuliskan syarat pembayaran"/>
+                  </div>
+                )}
+              </div>
+
+              {/* Additional Options */}
+              <div className="bg-white rounded-xl shadow-sm p-5">
+                <h2 className="text-xs font-bold text-blue-700 uppercase tracking-widest mb-4">Additional Options</h2>
+                <div className="space-y-3">
+                  {/* 5a — PPN on OAT */}
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={form.applyPPNOnOAT||false} onChange={e => set('applyPPNOnOAT')(e.target.checked)} className="w-4 h-4 rounded accent-blue-600"/>
+                    <div><p className="text-sm text-gray-700 font-medium">Apply PPN 11% on OAT / Freight</p>
+                      <p className="text-xs text-gray-400">Check if freight cost is subject to VAT</p></div>
+                  </label>
+                  {/* 5b — Bank info */}
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={form.showBankInfo !== false} onChange={e => set('showBankInfo')(e.target.checked)} className="w-4 h-4 rounded accent-blue-600"/>
+                    <div><p className="text-sm text-gray-700 font-medium">Show Bank Account in Letter</p>
+                      <p className="text-xs text-gray-400">Includes payment bank details in the quotation</p></div>
+                  </label>
+                  {/* 5c — Min quantity */}
+                  <div className="border-t pt-3">
+                    <label className="flex items-center gap-3 cursor-pointer mb-2">
+                      <input type="checkbox" checked={form.minQtyEnabled||false} onChange={e => set('minQtyEnabled')(e.target.checked)} className="w-4 h-4 rounded accent-blue-600"/>
+                      <div><p className="text-sm text-gray-700 font-medium">Minimum Order Quantity</p>
+                        <p className="text-xs text-gray-400">Show minimum volume requirement in letter</p></div>
+                    </label>
+                    {form.minQtyEnabled && (
+                      <div className="ml-7">
+                        <Lbl>Minimum Quantity (Liter)</Lbl>
+                        <input type="number" value={form.minQty||''} onChange={e => set('minQty')(e.target.value)}
+                          className={inp} placeholder="e.g. 100000"/>
+                      </div>
+                    )}
+                  </div>
+                  {/* 5f — PBBKB included note */}
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={form.pbbkbIncludedNote||false} onChange={e => set('pbbkbIncludedNote')(e.target.checked)} className="w-4 h-4 rounded accent-blue-600"/>
+                    <div><p className="text-sm text-gray-700 font-medium">PBBKB sudah termasuk harga jual</p>
+                      <p className="text-xs text-gray-400">Tampilkan catatan bahwa PBBKB sudah di-include (non-WAPU area)</p></div>
+                  </label>
+                </div>
               </div>
 
               {/* Options */}
@@ -671,7 +728,7 @@ export default function OfferingLetter() {
                         {ol.docNumber}
                         {ol.revisionNo > 0 && <span className="ml-1 text-orange-500 text-[10px]">Rev.{ol.revisionNo}</span>}
                       </td>
-                      <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{ol.olDate}</td>
+                      <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{fmtDate(ol.olDate)}</td>
                       <td className="px-4 py-3 font-medium text-gray-700 max-w-[180px] truncate">{ol.clientName}</td>
                       <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{ol.period}</td>
                       <td className="px-4 py-3 font-mono font-semibold text-gray-700">
@@ -692,10 +749,16 @@ export default function OfferingLetter() {
                               Edit
                             </button>
                           )}
-                          <button onClick={() => setPrinting(ol)}
-                            className="text-[10px] bg-gray-50 text-gray-600 border border-gray-200 px-2 py-1 rounded hover:bg-gray-100">
-                            🖨️
-                          </button>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => printInNewWindow(ol, 'id')}
+                              className="text-[10px] bg-gray-50 text-gray-600 border border-gray-200 px-2 py-1 rounded hover:bg-gray-100" title="Print Bahasa Indonesia">
+                              🖨️ ID
+                            </button>
+                            <button onClick={() => printInNewWindow(ol, 'en')}
+                              className="text-[10px] bg-gray-50 text-gray-600 border border-gray-200 px-2 py-1 rounded hover:bg-gray-100" title="Print English">
+                              🖨️ EN
+                            </button>
+                          </div>
                           {canDelete(userRole) && (
                             <button onClick={() => remove(ol.id)}
                               className="text-[10px] bg-red-50 text-red-500 border border-red-100 px-2 py-1 rounded hover:bg-red-100">
@@ -717,170 +780,265 @@ export default function OfferingLetter() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Print view
+// Generate complete self-contained HTML for print window
 // ─────────────────────────────────────────────────────────────────────────────
-function OLPrint({ data, company, rates, provs }) {
+function generateOLHtml(data, company, rates, provs, lang = 'id') {
+  const isEN = lang === 'en';
+  const fmtNum = (v) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(v) || 0);
+  const fmtDateFull = (s) => {
+    if (!s) return '';
+    const d = new Date(s + 'T12:00:00');
+    const months_id = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+    const months_en = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    return isEN
+      ? `${d.getDate()} ${months_en[d.getMonth()]} ${d.getFullYear()}`
+      : `${d.getDate()} ${months_id[d.getMonth()]} ${d.getFullYear()}`;
+  };
+
   const ppnRate  = (parseFloat(rates?.ppn) || 11) / 100;
   const pphRate  = (parseFloat(rates?.pph) || 0.3) / 100;
   const prov     = provs.find(p => p.name === data.province);
   const pbbkbR   = (data.applyPBBKB && prov) ? parseFloat(prov.rate) / 100 : 0;
   const dpp      = parseFloat(data.dpp) || 0;
-  const ppnAmt   = data.applyPPN    ? dpp * ppnRate : 0;
-  const pphAmt   = data.applyPPH    ? dpp * pphRate : 0;
-  const pbbkbAmt = pbbkbR > 0       ? dpp * pbbkbR  : 0;
+  const ppnAmt   = data.applyPPN  ? dpp * ppnRate  : 0;
+  const pphAmt   = data.applyPPH  ? dpp * pphRate  : 0;
+  const pbbkbAmt = pbbkbR > 0     ? dpp * pbbkbR   : 0;
   const totalPerL = dpp + ppnAmt + pbbkbAmt;
 
-  const banks    = company.banks || [];
-  const bank     = data.bankId
+  const banks = company.banks || [];
+  const bank  = data.bankId
     ? banks.find(b => b.id === data.bankId || String(b.id) === String(data.bankId)) || banks[0] || {}
     : banks.find(b => b.isPrimary) || banks[0] || {};
 
   const addrLines = (data.clientAddress || '').split('\n').filter(Boolean);
+  const isDraft   = data.approvalStatus !== 'approved';
 
-  return (
-    <div className="bg-white font-sans text-sm" style={{ minHeight: '297mm', padding: '15mm' }}>
-      {/* Letterhead */}
-      <div className="flex items-start justify-between mb-6 border-b-2 border-blue-900 pb-4">
-        <div className="flex items-center gap-4">
-          <img src={logo} alt="GPP" className="w-16 h-16 object-contain"/>
-          <div>
-            <p className="font-bold text-blue-900 text-base">{company.name || 'PT Global Petro Pasifik'}</p>
-            <p className="text-gray-500 text-xs">{company.address}</p>
-          </div>
-        </div>
-        <div className="text-right">
-          <p className="font-bold text-gray-800 text-lg">SURAT PENAWARAN HARGA</p>
-          {!isApproved(data.approvalStatus) && (
-            <span className="inline-block text-[10px] text-red-500 border border-red-300 rounded px-2 py-0.5 mt-0.5">DRAFT</span>
-          )}
-          <p className="text-xs text-gray-500 mt-1">No: <b>{data.docNumber}</b></p>
-          <p className="text-xs text-gray-500">{formatDateID(data.olDate)}</p>
-          {data.revisionNo > 0 && <p className="text-xs text-orange-500">Revisi ke-{data.revisionNo}</p>}
-        </div>
-      </div>
+  // Payment label
+  const payLabel = () => {
+    const t = data.paymentMode;
+    if (t === 'Credit') return isEN
+      ? `Net ${data.clientTOP || 45} days after delivery`
+      : `${data.clientTOP || 45} hari setelah pengiriman`;
+    if (t === 'CBD') return isEN ? 'Cash Before Delivery (CBD)' : 'Tunai Sebelum Pengiriman (CBD)';
+    if (t === 'COD') return isEN ? 'Cash On Delivery (COD)'     : 'Tunai Saat Pengiriman (COD)';
+    if (t === 'SKBDN') return (data.paymentOther ? data.paymentOther + ' — ' : '') + 'SKBDN / LC';
+    if (t === 'DP')    return data.paymentOther || (isEN ? 'Downpayment arrangement' : 'Pembayaran dengan uang muka');
+    return data.paymentOther || t;
+  };
 
-      {/* Client address block */}
-      <div className="mb-5 text-xs">
-        <p className="text-gray-400 mb-0.5">Kepada Yth,</p>
-        <p className="font-bold text-gray-800 text-sm">{data.clientName}</p>
-        {addrLines.map((line, i) => <p key={i} className="text-gray-600">{line}</p>)}
-        {data.clientNPWP && <p className="text-gray-400 mt-0.5">NPWP: {data.clientNPWP}</p>}
-      </div>
+  // OAT PPN
+  const oatRows = (data.transportSites || []).map(s => {
+    const oat = parseFloat(s.oatRate) || 0;
+    const ppnOAT = (data.applyPPNOnOAT && data.applyPPN) ? oat * ppnRate : 0;
+    return { ...s, oat, ppnOAT, total: oat + ppnOAT };
+  });
 
-      {/* Meta table */}
-      <table className="mb-5 text-xs">
-        <tbody>
-          <tr><td className="text-gray-500 w-28 pr-2 align-top">Perihal</td><td className="font-bold">: Penawaran Harga {data.product}</td></tr>
-          <tr><td className="text-gray-500 pr-2">Periode</td><td>: {data.period}</td></tr>
-          {data.refContract && <tr><td className="text-gray-500 pr-2">Ref. Kontrak</td><td>: {data.refContract}</td></tr>}
-        </tbody>
-      </table>
+  const T = {
+    title:     isEN ? 'PRICE QUOTATION'          : 'SURAT PENAWARAN HARGA',
+    to:        isEN ? 'Attention:'               : 'Kepada Yth,',
+    re:        isEN ? 'Subject'                  : 'Perihal',
+    period:    isEN ? 'Pricing Period'           : 'Periode',
+    ref:       isEN ? 'Contract Ref.'            : 'Ref. Kontrak',
+    intro:     isEN
+      ? `Dear Sir / Madam, we are pleased to submit our price quotation for ${data.product} for the period of ${data.period} as follows:`
+      : `Dengan hormat, bersama ini kami sampaikan penawaran harga ${data.product} untuk periode ${data.period} sebagai berikut:`,
+    hdpp:      isEN ? 'Base Price (Tax Base)'    : 'Harga Dasar Pengenaan Pajak',
+    hppn:      isEN ? `VAT ${rates?.ppn||11}%`   : `PPN ${rates?.ppn||11}%`,
+    hpbbkb:    isEN ? `Fuel Tax (PBBKB) ${prov?.rate||''}%` : `PBBKB ${prov?.rate||''}% — ${data.province}`,
+    htotal:    isEN ? 'TOTAL PRICE / LITRE'      : 'TOTAL HARGA / LITER',
+    noteBase:  isEN ? 'Base selling price excl. tax' : 'Harga jual sebelum pajak',
+    notePPN:   isEN ? 'Value Added Tax (VAT)'    : 'Pajak Pertambahan Nilai',
+    notePBBKB: isEN ? 'Motor Vehicle Fuel Tax'   : 'Pajak Bahan Bakar Kend. Bermotor',
+    freight:   isEN ? 'Freight / OAT:'           : 'Biaya Transportasi / OAT:',
+    freightSite: isEN ? 'Delivery Location'      : 'Lokasi Pengiriman',
+    freightRate: isEN ? 'OAT (IDR/L)'            : 'OAT (IDR/L)',
+    freightPPN:  isEN ? 'PPN 11%'                : 'PPN 11%',
+    freightTotal:isEN ? 'Total OAT'              : 'Total OAT',
+    payTerm:   isEN ? 'Terms of Payment'         : 'Syarat Pembayaran',
+    pph:       isEN ? `Income Tax (PPH) ${rates?.pph||0.3}% (charged to buyer)` : `PPH ${rates?.pph||0.3}% (menjadi beban pembeli)`,
+    loss:      isEN ? 'Loss Tolerance'           : 'Toleransi Susut',
+    lossVal:   isEN
+      ? `${data.lossRate || 0}% of delivered volume — based on valid calibrated flowmeter or other valid measurement equipment`
+      : `${data.lossRate || 0}% dari volume pengiriman — berdasarkan flowmeter atau bejana ukur lainnya yang valid terkalibrasi oleh metrologi`,
+    minQty:    isEN ? 'Minimum Order Quantity'   : 'Minimum Kuantitas Pesanan',
+    bankTitle: isEN ? 'Payment to:'              : 'Pembayaran ditujukan ke:',
+    closing:   isEN
+      ? 'We hope this quotation meets your requirements. This offer is valid for the pricing period stated above. Thank you for your kind attention.'
+      : 'Demikian penawaran ini kami sampaikan. Penawaran berlaku sesuai periode yang tercantum di atas. Atas perhatian dan kerjasamanya kami ucapkan terima kasih.',
+    regards:   isEN ? 'Yours sincerely,'         : 'Hormat kami,',
+    director:  isEN ? 'Director'                 : 'Direktur',
+    compGen:   isEN
+      ? '— Computer Generated — No Signature Required — This document is electronically issued and valid without a wet signature.'
+      : '— Computer Generated — No Signature Required — Dokumen ini diterbitkan secara elektronik dan sah tanpa tanda tangan basah.',
+    pbbkbNote: isEN
+      ? 'Note: Fuel Tax (PBBKB) is already included in the stated base price.'
+      : 'Catatan: PBBKB sudah termasuk dalam harga jual yang tercantum di atas.',
+  };
 
-      <p className="mb-4 text-xs text-gray-700 leading-relaxed">
-        Dengan hormat, bersama ini kami sampaikan penawaran harga {data.product} untuk periode {data.period} sebagai berikut:
-      </p>
+  const rows = [
+    `<tr><td class="border px-3 py-2 font-semibold">${T.hdpp}</td><td class="border px-3 py-2 text-right font-mono font-semibold">${fmtNum(dpp)}</td><td class="border px-3 py-2 text-gray-500">${T.noteBase}</td></tr>`,
+    data.applyPPN ? `<tr class="bg-gray-50"><td class="border px-3 py-2">${T.hppn}</td><td class="border px-3 py-2 text-right font-mono">${fmtNum(ppnAmt)}</td><td class="border px-3 py-2 text-gray-500">${T.notePPN}</td></tr>` : '',
+    pbbkbAmt > 0  ? `<tr class="bg-gray-50"><td class="border px-3 py-2">${T.hpbbkb}</td><td class="border px-3 py-2 text-right font-mono">${fmtNum(pbbkbAmt)}</td><td class="border px-3 py-2 text-gray-500">${T.notePBBKB}</td></tr>` : '',
+    `<tr class="bg-blue-50"><td class="border px-3 py-2 font-bold text-blue-900">${T.htotal}</td><td class="border px-3 py-2 text-right font-bold font-mono text-blue-900 text-base">${fmtNum(totalPerL)}</td><td class="border px-3 py-2"></td></tr>`,
+  ].join('');
 
-      {/* Price table */}
-      <table className="w-full border-collapse text-xs mb-4">
-        <thead>
-          <tr className="bg-blue-900 text-white">
-            <th className="border border-blue-700 px-3 py-2 text-left">Keterangan</th>
-            <th className="border border-blue-700 px-3 py-2 text-right w-36">IDR / Liter</th>
-            <th className="border border-blue-700 px-3 py-2 text-left">Catatan</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr className="bg-white">
-            <td className="border border-gray-200 px-3 py-1.5 font-semibold">DPP / Harga Dasar</td>
-            <td className="border border-gray-200 px-3 py-1.5 text-right font-mono font-semibold">{fmtNum(dpp)}</td>
-            <td className="border border-gray-200 px-3 py-1.5 text-gray-500">Harga jual sebelum pajak</td>
-          </tr>
-          {data.applyPPN && (
-            <tr className="bg-gray-50">
-              <td className="border border-gray-200 px-3 py-1.5">PPN {rates?.ppn || 11}%</td>
-              <td className="border border-gray-200 px-3 py-1.5 text-right font-mono">{fmtNum(ppnAmt)}</td>
-              <td className="border border-gray-200 px-3 py-1.5 text-gray-500">Pajak Pertambahan Nilai</td>
-            </tr>
-          )}
-          {pbbkbAmt > 0 && (
-            <tr className="bg-gray-50">
-              <td className="border border-gray-200 px-3 py-1.5">PBBKB {prov?.rate}% — {data.province}</td>
-              <td className="border border-gray-200 px-3 py-1.5 text-right font-mono">{fmtNum(pbbkbAmt)}</td>
-              <td className="border border-gray-200 px-3 py-1.5 text-gray-500">Pajak Bahan Bakar Kend. Bermotor</td>
-            </tr>
-          )}
-          <tr className="bg-blue-50">
-            <td className="border border-gray-200 px-3 py-2 font-bold text-blue-900">TOTAL HARGA / LITER</td>
-            <td className="border border-gray-200 px-3 py-2 text-right font-bold font-mono text-blue-900 text-sm">{fmtNum(totalPerL)}</td>
-            <td className="border border-gray-200 px-3 py-2"/>
-          </tr>
-        </tbody>
-      </table>
+  const oatHtml = oatRows.length > 0 ? `
+    <p style="font-weight:600;font-size:12px;margin-bottom:6px">${T.freight}</p>
+    <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:12px">
+      <thead><tr style="background:#374151;color:white">
+        <th style="border:1px solid #6b7280;padding:6px 10px;text-align:left">${T.freightSite}</th>
+        <th style="border:1px solid #6b7280;padding:6px 10px;text-align:right">${T.freightRate}</th>
+        ${data.applyPPNOnOAT && data.applyPPN ? `<th style="border:1px solid #6b7280;padding:6px 10px;text-align:right">${T.freightPPN}</th><th style="border:1px solid #6b7280;padding:6px 10px;text-align:right">${T.freightTotal}</th>` : ''}
+      </tr></thead>
+      <tbody>
+        ${oatRows.map((s,i)=>`
+          <tr style="background:${i%2===0?'white':'#f9fafb'}">
+            <td style="border:1px solid #e5e7eb;padding:5px 10px">${s.name}</td>
+            <td style="border:1px solid #e5e7eb;padding:5px 10px;text-align:right;font-family:monospace">${fmtNum(s.oat)}</td>
+            ${data.applyPPNOnOAT && data.applyPPN ? `<td style="border:1px solid #e5e7eb;padding:5px 10px;text-align:right;font-family:monospace">${fmtNum(s.ppnOAT)}</td><td style="border:1px solid #e5e7eb;padding:5px 10px;text-align:right;font-family:monospace;font-weight:600">${fmtNum(s.total)}</td>` : ''}
+          </tr>`).join('')}
+      </tbody>
+    </table>` : '';
 
-      {/* OAT table */}
-      {(data.transportSites || []).length > 0 && (
-        <div className="mb-4">
-          <p className="font-semibold text-xs text-gray-700 mb-2">Biaya Transportasi / OAT:</p>
-          <table className="w-full border-collapse text-xs">
-            <thead>
-              <tr className="bg-gray-700 text-white">
-                <th className="border border-gray-600 px-3 py-1.5 text-left">Lokasi Pengiriman</th>
-                <th className="border border-gray-600 px-3 py-1.5 text-right w-32">OAT (IDR/L)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.transportSites.map((site, i) => (
-                <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                  <td className="border border-gray-200 px-3 py-1.5">{site.name}</td>
-                  <td className="border border-gray-200 px-3 py-1.5 text-right font-mono">{fmtNum(site.oatRate)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+  const bankHtml = (data.showBankInfo !== false) && bank.bankName ? `
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:12px 16px;font-size:11px;margin-bottom:20px">
+      <p style="font-weight:600;color:#374151;margin-bottom:4px">${T.bankTitle}</p>
+      <p><b>${bank.bankName}</b> — ${bank.accountNo} a/n <b>${bank.accountName || company.name}</b>${bank.branch ? ` (Cab. ${bank.branch})` : ''}</p>
+    </div>` : '';
 
-      {/* Terms */}
-      <div className="text-xs space-y-1 mb-5">
-        <p><b>Syarat Pembayaran:</b> {paymentLabel(data)}</p>
-        {data.applyPPH && <p><b>PPH {rates?.pph || 0.3}%:</b> {fmtNum(pphAmt)}/L (menjadi beban pembeli)</p>}
-        {data.lossRate > 0 && <p><b>Toleransi Susut:</b> {data.lossRate}% dari volume pengiriman</p>}
-        {data.notes && <p className="text-gray-500 mt-2">{data.notes}</p>}
-      </div>
-
-      {/* Bank */}
-      {(bank.bankName || bank.accountNo) && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-xs mb-6">
-          <p className="font-semibold text-gray-700 mb-1">Pembayaran ditujukan ke:</p>
-          <p>
-            <b>{bank.bankName}</b> — {bank.accountNo} a/n <b>{bank.accountName}</b>
-            {bank.branch ? ` (Cab. ${bank.branch})` : ''}
-          </p>
-        </div>
-      )}
-
-      <p className="text-xs text-gray-600 mb-8 leading-relaxed">
-        Demikian penawaran ini kami sampaikan. Penawaran berlaku sesuai periode yang tercantum di atas.
-        Atas perhatian dan kerjasamanya kami ucapkan terima kasih.
-      </p>
-
-      {/* Signatures */}
-      {data.computerGenerated ? (
-        <div className="border border-gray-200 rounded-lg px-4 py-3 text-xs text-center text-gray-400">
-          <p className="font-semibold">— Computer Generated — No Signature Required —</p>
-          <p className="mt-0.5">Dokumen ini diterbitkan secara elektronik dan sah tanpa tanda tangan basah.</p>
-        </div>
-      ) : (
-        <div className="flex justify-end mt-4">
-          <div className="text-center w-52 text-xs">
-            <p className="text-gray-500">Hormat kami,</p>
-            <p className="font-semibold text-gray-800 mt-0.5">{company.name || 'PT Global Petro Pasifik'}</p>
-            <div className="mt-16 border-t border-gray-400">
-              <p className="mt-1 text-gray-500">Direktur</p>
-            </div>
-          </div>
-        </div>
-      )}
+  const toggleScript = `
+    <div id="lang-bar" style="position:fixed;top:0;left:0;right:0;background:#1e3a8a;color:white;padding:8px 20px;display:flex;align-items:center;gap:16px;z-index:999;font-family:sans-serif;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,0.3)">
+      <span style="font-weight:700">GPP Portal — Offering Letter Preview</span>
+      <span style="margin-left:auto;display:flex;gap:8px;align-items:center">
+        <span>Language:</span>
+        <button onclick="switchLang('id')" id="btn-id" style="padding:3px 12px;border-radius:99px;border:none;cursor:pointer;font-weight:700;background:${!isEN?'white':'rgba(255,255,255,0.2)'};color:${!isEN?'#1e3a8a':'white'}">🇮🇩 ID</button>
+        <button onclick="switchLang('en')" id="btn-en" style="padding:3px 12px;border-radius:99px;border:none;cursor:pointer;font-weight:700;background:${isEN?'white':'rgba(255,255,255,0.2)'};color:${isEN?'#1e3a8a':'white'}">🇬🇧 EN</button>
+        <button onclick="window.print()" style="padding:4px 16px;border-radius:6px;border:none;cursor:pointer;background:#f59e0b;color:white;font-weight:700;margin-left:8px">🖨️ Print / Save PDF</button>
+      </span>
     </div>
-  );
+    <script>
+      const olData = ${JSON.stringify({ data, company: {name:company.name,address:company.address,npwp:company.npwp,banks:company.banks||[]}, rates, provs })};
+      function switchLang(l) {
+        document.title = 'Switching...';
+        // Re-open with same data, different lang stored
+        sessionStorage.setItem('olPrintLang', l);
+        location.reload();
+      }
+      // On load, check if we need a different lang
+      const savedLang = sessionStorage.getItem('olPrintLang');
+      if (savedLang && savedLang !== '${lang}') {
+        sessionStorage.removeItem('olPrintLang');
+        // will be handled by button click on next reload
+      }
+    <\/script>`;
+
+  return `<!DOCTYPE html><html lang="${lang}"><head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>${isDraft ? '[DRAFT] ' : ''}${data.docNumber} — ${data.clientName}</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Segoe UI',Arial,sans-serif; color:#374151; font-size:12px; line-height:1.5; background:white; }
+  .page { max-width:210mm; margin:0 auto; padding:70px 20mm 15mm; }
+  table { width:100%; border-collapse:collapse; }
+  .border { border:1px solid #e5e7eb; }
+  .font-mono { font-family:monospace; }
+  .font-bold { font-weight:700; }
+  .font-semibold { font-weight:600; }
+  .text-right { text-align:right; }
+  .bg-gray-50 { background:#f9fafb; }
+  .bg-blue-50 { background:#eff6ff; }
+  .text-blue-900 { color:#1e3a8a; }
+  .text-gray-500 { color:#6b7280; }
+  th { background:#1e3a8a; color:white; text-align:left; padding:8px 12px; font-size:11px; }
+  td { padding:7px 12px; border-bottom:1px solid #e5e7eb; vertical-align:top; }
+  @media print {
+    #lang-bar { display:none !important; }
+    .page { padding:15mm; }
+    @page { size:A4; margin:0; }
+  }
+</style></head><body>
+${toggleScript}
+<div class="page">
+  ${isDraft ? `<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-size:80px;color:rgba(220,38,38,0.12);font-weight:900;pointer-events:none;user-select:none;z-index:0">DRAFT</div>` : ''}
+
+  <!-- Letterhead -->
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #1e3a8a;padding-bottom:16px;margin-bottom:20px">
+    <div>
+      <p style="font-weight:800;color:#1e3a8a;font-size:15px">${company.name || 'PT Global Petro Pasifik'}</p>
+      <p style="color:#6b7280;font-size:10px;margin-top:2px">${company.address||''}</p>
+      ${company.npwp ? `<p style="color:#6b7280;font-size:10px">NPWP: ${company.npwp}</p>` : ''}
+    </div>
+    <div style="text-align:right">
+      <p style="font-weight:800;color:#1f2937;font-size:16px;letter-spacing:.5px">${T.title}</p>
+      ${isDraft ? `<span style="font-size:10px;color:#dc2626;border:1px solid #dc2626;border-radius:4px;padding:1px 8px;display:inline-block;margin-top:2px">DRAFT</span>` : ''}
+      <p style="color:#6b7280;font-size:10px;margin-top:4px">No: <b>${data.docNumber||''}</b>${data.revisionNo>0 ? ` | Rev.${data.revisionNo}` : ''}</p>
+      <p style="color:#6b7280;font-size:10px">${fmtDateFull(data.olDate)}</p>
+    </div>
+  </div>
+
+  <!-- Address -->
+  <div style="margin-bottom:16px;font-size:11px">
+    <p style="color:#9ca3af;margin-bottom:2px">${T.to}</p>
+    <p style="font-weight:700;font-size:13px;color:#111827">${data.clientName||''}</p>
+    ${addrLines.map(l=>`<p style="color:#4b5563">${l}</p>`).join('')}
+    ${data.clientNPWP ? `<p style="color:#9ca3af;margin-top:2px">NPWP: ${data.clientNPWP}</p>` : ''}
+  </div>
+
+  <!-- Meta -->
+  <table style="width:auto;margin-bottom:16px">
+    <tbody style="font-size:11px">
+      <tr><td style="color:#6b7280;width:120px;padding:2px 0;border:none">${T.re}</td><td style="font-weight:700;border:none;padding:2px 0">: ${isEN?'Price Quotation for':'Penawaran Harga'} ${data.product||''}</td></tr>
+      <tr><td style="color:#6b7280;padding:2px 0;border:none">${T.period}</td><td style="border:none;padding:2px 0">: ${data.period||''}</td></tr>
+      ${data.refContract ? `<tr><td style="color:#6b7280;padding:2px 0;border:none">${T.ref}</td><td style="border:none;padding:2px 0">: ${data.refContract}</td></tr>` : ''}
+    </tbody>
+  </table>
+
+  <p style="margin-bottom:16px;font-size:11px;color:#374151;line-height:1.6">${T.intro}</p>
+
+  <!-- Price table -->
+  <table style="font-size:11px;margin-bottom:16px">
+    <thead><tr>
+      <th style="text-align:left;width:40%">${isEN?'Description':'Keterangan'}</th>
+      <th style="text-align:right;width:25%">IDR / Liter</th>
+      <th style="text-align:left">${isEN?'Notes':'Catatan'}</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+
+  ${data.pbbkbIncludedNote ? `<p style="font-size:10px;color:#d97706;margin-bottom:12px;font-style:italic">* ${T.pbbkbNote}</p>` : ''}
+
+  <!-- OAT -->
+  ${oatHtml}
+
+  <!-- Terms -->
+  <div style="font-size:11px;margin-bottom:16px;line-height:1.7">
+    <p><b>${T.payTerm}:</b> ${payLabel()}</p>
+    ${data.applyPPH ? `<p><b>${T.pph}:</b> ${fmtNum(pphAmt)}/L</p>` : ''}
+    ${data.lossRate > 0 ? `<p><b>${T.loss}:</b> ${T.lossVal}</p>` : ''}
+    ${data.minQtyEnabled && data.minQty ? `<p><b>${T.minQty}:</b> ${Number(data.minQty).toLocaleString('id-ID')} Liter</p>` : ''}
+    ${data.notes ? `<p style="color:#6b7280;margin-top:6px">${data.notes}</p>` : ''}
+  </div>
+
+  <!-- Bank -->
+  ${bankHtml}
+
+  <p style="font-size:11px;color:#4b5563;margin-bottom:32px;line-height:1.6">${T.closing}</p>
+
+  <!-- Signature -->
+  ${data.computerGenerated ? `
+    <div style="border:1px solid #e5e7eb;border-radius:6px;padding:12px 16px;text-align:center;font-size:10px;color:#9ca3af">
+      <p>${T.compGen}</p>
+    </div>` : `
+    <div style="display:flex;justify-content:flex-end">
+      <div style="text-align:center;width:180px;font-size:11px">
+        <p style="color:#6b7280">${T.regards}</p>
+        <p style="font-weight:700;color:#1f2937;margin-top:2px">${company.name||'PT Global Petro Pasifik'}</p>
+        <div style="margin-top:60px;border-top:1px solid #9ca3af;padding-top:4px">
+          <p style="color:#6b7280">${T.director}</p>
+        </div>
+      </div>
+    </div>`}
+
+</div>
+</body></html>`;
 }

@@ -5,7 +5,7 @@ import {
   SOS_REF, STOCKS_REF, OLS_REF, applyApprovalDirect, approveSoFinal,
   getApproverEmails, sendApprovalEmail, getSubmitterEmail,
 } from '../../firebase.js';
-import { today, formatIDR, formatDateID, toRoman } from '../../utils/utils.js';
+import { today, formatIDR, formatDateID, toRoman , fmtDate} from '../../utils/utils.js';
 import {
   getChain, firstPending, nextStatus, canApprove, canSubmit,
   isApproved, isEditable, statusMeta, canDelete,

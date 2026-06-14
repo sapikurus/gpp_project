@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../../App.jsx';
 import { fetchCollection, createNumberedDoc, DOS_REF, POS_REF } from '../../firebase.js';
-import { formatIDR, formatDateID, buildDONumber, buildBDRNumber, today, terbilang } from '../../utils/utils.js';
+import { formatIDR, formatDateID, buildDONumber, buildBDRNumber, today, terbilang , fmtDate} from '../../utils/utils.js';
 import PrintWrapper from '../Layout/PrintWrapper.jsx';
 import logo from '../../assets/gpp-logo.png';
 
