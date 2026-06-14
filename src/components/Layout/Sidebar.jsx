@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { logout, changePassword } from '../../firebase.js';
+import { logout, changePassword, initPushNotifications } from '../../firebase.js';
 import { useApp } from '../../App.jsx';
 import { canSeeMasterData, ROLE_MENU } from '../../utils/approvalUtils.js';
 import logo from '../../assets/gpp-logo.png';
@@ -23,6 +23,23 @@ export default function Sidebar() {
   const [pwError, setPwError] = useState('');
   const [pwSaving, setPwSaving] = useState(false);
   const [pwDone,   setPwDone]   = useState(false);
+  const [notifState, setNotifState] = useState('idle'); // idle | loading | ok | denied | error
+
+  const registerNotifications = async () => {
+    setNotifState('loading');
+    try {
+      if (!('Notification' in window)) { setNotifState('error'); return; }
+      const perm = await Notification.requestPermission();
+      if (perm === 'denied') { setNotifState('denied'); setTimeout(() => setNotifState('idle'), 4000); return; }
+      await initPushNotifications(user?.email, userRole);
+      setNotifState('ok');
+      setTimeout(() => setNotifState('idle'), 4000);
+    } catch(e) {
+      console.warn('Notification registration:', e.message);
+      setNotifState('error');
+      setTimeout(() => setNotifState('idle'), 4000);
+    }
+  };
 
   const handleChangePw = async () => {
     setPwError('');
@@ -138,6 +155,29 @@ export default function Sidebar() {
         <button onClick={()=>{setShowPwModal(true);closeSidebar();}}
           className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-blue-200 hover:bg-blue-800 hover:text-white transition-colors">
           <span>🔑</span> {t('nav_change_pw')}
+        </button>
+
+        {/* Notification registration — visible to all users */}
+        <button onClick={registerNotifications} disabled={notifState === 'loading'}
+          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors ${
+            notifState === 'ok'     ? 'text-green-300 hover:bg-blue-800' :
+            notifState === 'denied' ? 'text-red-300 hover:bg-blue-800'  :
+            notifState === 'error'  ? 'text-amber-300 hover:bg-blue-800':
+                                      'text-blue-200 hover:bg-blue-800 hover:text-white'
+          }`}>
+          <span>
+            {notifState === 'loading' ? '⏳' :
+             notifState === 'ok'      ? '✅' :
+             notifState === 'denied'  ? '🚫' :
+             notifState === 'error'   ? '⚠️' : '🔔'}
+          </span>
+          <span>
+            {notifState === 'loading' ? 'Registering…' :
+             notifState === 'ok'      ? 'Notifications enabled!' :
+             notifState === 'denied'  ? 'Permission denied — check browser settings' :
+             notifState === 'error'   ? 'Registration failed — try again' :
+                                        'Enable Notifications'}
+          </span>
         </button>
         <div className="flex gap-1 px-3">
           <a href="/manual-id.html" target="_blank" rel="noopener"
