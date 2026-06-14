@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../../App.jsx';
-import { fetchCollection, createNumberedDoc, updateSubDoc, deleteSubDoc, POS_REF, getApproverEmails, sendApprovalEmail, getSubmitterEmail } from '../../firebase.js';
+import { fetchCollection, createNumberedDoc, updateSubDoc, deleteSubDoc, POS_REF, getApproverEmails, sendApprovalEmail, getSubmitterEmail, requestPushNotification } from '../../firebase.js';
 import { formatIDR, formatDateID, buildPONumber, today, terbilang , fmtDate} from '../../utils/utils.js';
 import { getPOChain, firstPending, nextStatus, isEditable, isApproved, statusMeta, canDelete, DEFAULT_PO_THRESHOLD } from '../../utils/approvalUtils.js';
 import ApprovalPanel, { StatusBadge, DraftWatermark } from '../Layout/ApprovalPanel.jsx';
@@ -77,21 +77,23 @@ export default function PurchaseOrder() {
         approvalHistory: h,
         effectiveChain: chain, // Store chain so it's consistent even if threshold changes
       });
-      // Email notification — fire and forget, never blocks approval flow
+      // Email + push notifications — fire and forget
       try {
         const approvers = await getApproverEmails();
         const approvalLabel = chain.length > 1 ? 'Manager → Director' : 'Manager';
+        const fmtTotal = new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(po.totalOrder||0);
         await sendApprovalEmail(appData?.settings, {
           to: approvers.all,
           subject: `[GPP Portal] PO ${po.docNumber} Awaiting Approval`,
-          body: `Purchase Order ${po.docNumber} has been submitted for approval.\n\n` +
-                `Vendor: ${po.vendorName || '–'}\n` +
-                `Total: ${new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(po.totalOrder||0)}\n` +
-                `Approval required: ${approvalLabel}\n` +
-                `Submitted by: ${user.email}\n\n` +
-                `Open in app: https://app.globalpetro.co.id/purchase-order`,
+          body: `Purchase Order ${po.docNumber} has been submitted for approval.\n\nVendor: ${po.vendorName||'–'}\nTotal: ${fmtTotal}\nApproval required: ${approvalLabel}\nSubmitted by: ${user.email}\n\nOpen in app: https://app.globalpetro.co.id/purchase-order`,
         });
-      } catch (emailErr) { console.warn('Email failed:', emailErr); }
+        await requestPushNotification({
+          title: `📋 PO Awaiting Approval`,
+          body: `${po.docNumber} · ${po.vendorName||'–'} · ${fmtTotal}`,
+          url: '/purchase-order',
+          targetRoles: chain,
+        });
+      } catch (emailErr) { console.warn('Notification failed:', emailErr); }
       setPOs(await fetchCollection(POS_REF())); setShowApproval(null);
     } finally { setSaving(false); }
   };

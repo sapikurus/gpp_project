@@ -15,6 +15,9 @@ import {
   updatePassword,
   EmailAuthProvider,
 } from 'firebase/auth';
+import {
+  getMessaging, getToken, onMessage,
+} from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
@@ -26,8 +29,57 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const db   = getFirestore(app);
-export const auth = getAuth(app);
+export const db      = getFirestore(app);
+export const auth    = getAuth(app);
+
+// FCM — initialised lazily (service worker must be registered first)
+let _messaging = null;
+const getMsg = () => {
+  if (!_messaging) _messaging = getMessaging(app);
+  return _messaging;
+};
+
+// ─── FCM Token Management ─────────────────────────────────────────────────────
+const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || '';
+const FCM_TOKENS_COL = 'fcm_tokens';
+const NOTIF_REQUESTS_COL = 'notification_requests';
+
+// Request push permission and get/save the device token
+export async function initPushNotifications(userEmail, userRole) {
+  if (!VAPID_KEY || !('Notification' in window) || !('serviceWorker' in navigator)) return;
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return;
+    // Wait for SW to be ready
+    const swReg = await navigator.serviceWorker.ready;
+    const token = await getToken(getMsg(), { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
+    if (!token) return;
+    // Save token keyed by email (sanitise . for Firestore)
+    const key = userEmail.replace(/\./g, '_');
+    await setDoc(doc(db, FCM_TOKENS_COL, key), {
+      token, email: userEmail, role: userRole, updatedAt: Date.now(),
+    });
+    // Listen for foreground messages and show browser notification
+    onMessage(getMsg(), payload => {
+      const { title, body } = payload.notification || {};
+      if (!title) return;
+      new Notification(title, { body, icon: '/favicon.png' });
+    });
+  } catch (e) {
+    console.warn('FCM init failed (non-blocking):', e.message);
+  }
+}
+
+// Create a notification request document — Cloud Function picks this up and sends FCM
+export async function requestPushNotification({ title, body, url = '/', targetRoles = ['manager','director'] }) {
+  try {
+    await addDoc(collection(db, NOTIF_REQUESTS_COL), {
+      title, body, url, targetRoles, createdAt: Date.now(),
+    });
+  } catch (e) {
+    console.warn('Push notification request failed (non-blocking):', e.message);
+  }
+}
 
 // Persist login across browser sessions
 setPersistence(auth, browserLocalPersistence).catch(() => {});

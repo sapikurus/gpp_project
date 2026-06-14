@@ -1,6 +1,6 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { ensureInit, fetchData, onAuth } from './firebase.js';
+import { ensureInit, fetchData, onAuth, initPushNotifications } from './firebase.js';
 import { getLang, setLang as saveLang, t as translate } from './i18n.js';
 
 import Login          from './components/Auth/Login.jsx';
@@ -42,6 +42,8 @@ export default function App() {
           setAppData(data);
           const role = (data?.userRoles || {})[u.email] || 'staff';
           setUserRole(role);
+          // Request push permission and register FCM token (non-blocking)
+          initPushNotifications(u.email, role).catch(() => {});
         } catch (e) { setError(e.message); }
       }
       setLoading(false);

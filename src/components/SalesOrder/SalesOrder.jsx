@@ -3,7 +3,7 @@ import { useApp } from '../../App.jsx';
 import {
   fetchCollection, createNumberedDoc, updateSubDoc, deleteSubDoc,
   SOS_REF, STOCKS_REF, OLS_REF, applyApprovalDirect, approveSoFinal,
-  getApproverEmails, sendApprovalEmail, getSubmitterEmail,
+  getApproverEmails, sendApprovalEmail, getSubmitterEmail, requestPushNotification,
 } from '../../firebase.js';
 import { today, formatIDR, formatDateID, toRoman , fmtDate} from '../../utils/utils.js';
 import {
@@ -108,21 +108,22 @@ export default function SalesOrder() {
         action: 'submit', nextApprovalStatus: firstPending(chain),
         role: userRole, email: user.email, note: '',
       });
-      // Email all managers + directors simultaneously
+      // Email + push — fire and forget
       try {
         const approvers = await getApproverEmails();
+        const volTxt = so.volume ? Number(so.volume).toLocaleString('id-ID')+' L' : '–';
         await sendApprovalEmail(appData?.settings, {
           to: approvers.all,
           subject: `[GPP Portal] SO ${so.docNumber} Awaiting Approval`,
-          body:
-            `Sales Order ${so.docNumber} has been submitted for approval.\n\n` +
-            `Client: ${so.clientName || '–'}\n` +
-            `Volume: ${so.volume ? Number(so.volume).toLocaleString('id-ID') + ' L' : '–'}\n` +
-            `Agreed Price: ${so.agreedPrice ? 'Rp ' + Number(so.agreedPrice).toLocaleString('id-ID') + '/L' : '–'}\n` +
-            `Submitted by: ${user.email}\n\n` +
-            `Open in app: https://app.globalpetro.co.id/sales-order`,
+          body: `Sales Order ${so.docNumber} has been submitted for approval.\n\nClient: ${so.clientName||'–'}\nVolume: ${volTxt}\nSubmitted by: ${user.email}\n\nOpen in app: https://app.globalpetro.co.id/sales-order`,
         });
-      } catch (emailErr) { console.warn('SO email failed:', emailErr); }
+        await requestPushNotification({
+          title: `🤝 SO Awaiting Approval`,
+          body: `${so.docNumber} · ${so.clientName||'–'} · ${volTxt}`,
+          url: '/sales-order',
+          targetRoles: ['manager','director'],
+        });
+      } catch (emailErr) { console.warn('SO notification failed:', emailErr); }
       setSOs(await fetchCollection(SOS_REF())); setShowDetail(null);
     } finally { setSaving(false); }
   };
