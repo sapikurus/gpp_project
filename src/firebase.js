@@ -261,6 +261,121 @@ export function getSubmitterEmail(approvalHistory) {
   return entry?.by || null;
 }
 
+// ─── FCM Diagnostics ──────────────────────────────────────────────────────────
+// Returns a full status report for the admin diagnostic panel
+export async function getFCMDiagnostics(userEmail) {
+  const result = {
+    vapidKey:      { ok: false, label: 'VAPID Key', detail: '' },
+    serviceWorker: { ok: false, label: 'Service Worker', detail: '' },
+    permission:    { ok: false, label: 'Notification Permission', detail: '' },
+    token:         { ok: false, label: 'FCM Token (this device)', detail: '' },
+    firestoreToken:{ ok: false, label: 'Token saved in Firestore', detail: '' },
+    registeredDevices: 0,
+    cloudFunction: { ok: null,  label: 'Cloud Function', detail: 'Will test when you send a notification' },
+  };
+
+  // 1. VAPID key
+  if (VAPID_KEY) {
+    result.vapidKey.ok = true;
+    result.vapidKey.detail = `Key loaded (${VAPID_KEY.length} chars)`;
+  } else {
+    result.vapidKey.detail = 'VITE_FIREBASE_VAPID_KEY is empty. Add it in Vercel env vars and redeploy.';
+  }
+
+  // 2. Service worker
+  if (!('serviceWorker' in navigator)) {
+    result.serviceWorker.detail = 'Service Workers not supported in this browser.';
+  } else {
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      const fcmSW = regs.find(r => r.active?.scriptURL?.includes('firebase-messaging-sw'));
+      if (fcmSW) {
+        result.serviceWorker.ok = true;
+        result.serviceWorker.detail = 'Registered: ' + fcmSW.active.scriptURL;
+      } else {
+        result.serviceWorker.detail = 'firebase-messaging-sw.js not found. Try reloading the app.';
+      }
+    } catch(e) {
+      result.serviceWorker.detail = 'Error: ' + e.message;
+    }
+  }
+
+  // 3. Permission
+  const perm = Notification.permission;
+  if (perm === 'granted') {
+    result.permission.ok = true;
+    result.permission.detail = 'Granted';
+  } else if (perm === 'denied') {
+    result.permission.detail = 'Denied by user — clear site permissions in browser settings and reload.';
+  } else {
+    result.permission.detail = 'Not yet requested — log out and back in to trigger the permission prompt.';
+  }
+
+  // 4. FCM token for this device
+  if (result.vapidKey.ok && result.serviceWorker.ok && result.permission.ok) {
+    try {
+      const swReg = await navigator.serviceWorker.ready;
+      const token = await getToken(getMsg(), { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
+      if (token) {
+        result.token.ok = true;
+        result.token.detail = token.slice(0, 20) + '…' + token.slice(-6);
+        // Save/refresh the token
+        if (userEmail) {
+          const key = userEmail.replace(/\./g, '_');
+          await setDoc(doc(db, FCM_TOKENS_COL, key), {
+            token, email: userEmail,
+            updatedAt: Date.now(),
+          }, { merge: true });
+          result.firestoreToken.ok = true;
+          result.firestoreToken.detail = 'Token saved / refreshed in Firestore.';
+        }
+      } else {
+        result.token.detail = 'getToken() returned null — check VAPID key and service worker.';
+      }
+    } catch(e) {
+      result.token.detail = 'Error getting token: ' + e.message;
+    }
+  } else {
+    result.token.detail = 'Cannot get token — fix issues above first.';
+    result.firestoreToken.detail = 'Waiting for token.';
+  }
+
+  // 5. Count all registered devices
+  try {
+    const snap = await getDocs(collection(db, FCM_TOKENS_COL));
+    result.registeredDevices = snap.size;
+    if (!result.firestoreToken.ok && snap.size > 0) {
+      result.firestoreToken.detail = `${snap.size} device(s) registered total (this device may not be included).`;
+    }
+  } catch(e) {
+    result.firestoreToken.detail = 'Could not read Firestore tokens: ' + e.message;
+  }
+
+  return result;
+}
+
+// Test whether the Cloud Function is deployed by watching if a test doc gets deleted
+export async function testCloudFunction() {
+  const { addDoc, collection: col, getDoc: gDoc, doc: d, deleteDoc: dDoc } = await import('firebase/firestore');
+  const testRef = await addDoc(collection(db, NOTIF_REQUESTS_COL), {
+    title: 'CF Test',
+    body: 'Cloud Function connectivity test',
+    url: '/',
+    targetRoles: [],
+    _test: true,
+    createdAt: Date.now(),
+  });
+  // Wait up to 12 seconds for the CF to delete the document
+  for (let i = 0; i < 12; i++) {
+    await new Promise(r => setTimeout(r, 1000));
+    const snap = await getDoc(doc(db, NOTIF_REQUESTS_COL, testRef.id));
+    if (!snap.exists()) return { ok: true, seconds: i + 1 };
+  }
+  // CF didn't pick it up — clean up and report failure
+  try { await deleteDoc(doc(db, NOTIF_REQUESTS_COL, testRef.id)); } catch {}
+  return { ok: false, seconds: 12 };
+}
+
 // ─── Approval helpers ─────────────────────────────────────────────────────────
 // Apply an approval action to a document
 // action: 'submit' | 'approve' | 'reject'

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { useApp } from '../../App.jsx';
-import { patchField, patchData, exportBackup, importBackup, requestPushNotification } from '../../firebase.js';
+import { patchField, patchData, exportBackup, importBackup, requestPushNotification, getFCMDiagnostics, testCloudFunction } from '../../firebase.js';
 import * as XLSX from 'xlsx';
 
 const F = ({ label, value, onChange, type = 'text', placeholder = '', step }) => (
@@ -822,7 +822,7 @@ function Facilities() {
 }
 
 function Settings() {
-  const { appData, reload, userRole } = useApp();
+  const { appData, reload, userRole, user } = useApp();
   const [endpoint, setEndpoint] = useState(appData?.settings?.mopsEndpoint || '');
   const [savingEP, setSavingEP] = useState(false);
   const [savedEP, setSavedEP]   = useState(false);
@@ -845,6 +845,30 @@ function Settings() {
   const [notifSending, setNotifSending] = useState(false);
   const [notifResult,  setNotifResult]  = useState('');
   const isDirector = userRole === 'director' || userRole === 'superadmin';
+
+  // Diagnostic state
+  const [diagLoading, setDiagLoading] = useState(false);
+  const [diagResult,  setDiagResult]  = useState(null);
+  const [cfTesting,   setCFTesting]   = useState(false);
+  const [cfResult,    setCFResult]    = useState(null);
+
+  const runDiagnostics = async () => {
+    setDiagLoading(true); setDiagResult(null); setCFResult(null);
+    try {
+      const r = await getFCMDiagnostics(user?.email);
+      setDiagResult(r);
+    } catch(e) { setDiagResult({ error: e.message }); }
+    finally { setDiagLoading(false); }
+  };
+
+  const runCFTest = async () => {
+    setCFTesting(true); setCFResult(null);
+    try {
+      const r = await testCloudFunction();
+      setCFResult(r);
+    } catch(e) { setCFResult({ ok: false, error: e.message }); }
+    finally { setCFTesting(false); }
+  };
 
   const sendTestNotif = async () => {
     setNotifSending(true); setNotifResult('');
@@ -1029,10 +1053,86 @@ function Settings() {
       {/* Push Notifications — Director / Super Admin only */}
       {isDirector && (
         <>
+          <Card title="🔬 FCM Push Diagnostics">
+            <p className="text-xs text-gray-400 mb-4">
+              Run this check to see exactly where the push notification chain is failing.
+              Each step must pass before notifications can be delivered.
+            </p>
+
+            <button onClick={runDiagnostics} disabled={diagLoading}
+              className="bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-50 mb-4">
+              {diagLoading ? '⏳ Running diagnostics…' : '🔬 Run Diagnostics'}
+            </button>
+
+            {diagResult && !diagResult.error && (
+              <div className="space-y-2 mb-4">
+                {[
+                  diagResult.vapidKey,
+                  diagResult.serviceWorker,
+                  diagResult.permission,
+                  diagResult.token,
+                  diagResult.firestoreToken,
+                ].map((step, i) => (
+                  <div key={i} className={`flex items-start gap-3 rounded-lg px-4 py-3 border ${
+                    step.ok ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+                  }`}>
+                    <span className="text-lg shrink-0">{step.ok ? '✅' : '❌'}</span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-800">{step.label}</p>
+                      <p className={`text-xs mt-0.5 ${step.ok ? 'text-green-700' : 'text-red-600'}`}>{step.detail}</p>
+                    </div>
+                  </div>
+                ))}
+                <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-sm text-blue-800">
+                  <b>Registered devices:</b> {diagResult.registeredDevices} device(s) have FCM tokens in Firestore
+                </div>
+              </div>
+            )}
+
+            {diagResult?.error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700 mb-4">
+                Diagnostics failed: {diagResult.error}
+              </div>
+            )}
+
+            {/* Cloud Function test */}
+            <div className="border-t pt-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">Cloud Function Test</p>
+              <p className="text-xs text-gray-400 mb-3">
+                Creates a test document in Firestore and waits up to 12 seconds to see if the Cloud Function picks it up and deletes it.
+                If it doesn't, the function is not deployed.
+              </p>
+              <button onClick={runCFTest} disabled={cfTesting}
+                className="border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-50 disabled:opacity-50">
+                {cfTesting ? '⏳ Waiting for Cloud Function… (up to 12s)' : '⚡ Test Cloud Function'}
+              </button>
+              {cfResult && (
+                <div className={`mt-3 rounded-lg px-4 py-3 text-sm border ${cfResult.ok ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                  {cfResult.ok
+                    ? `✅ Cloud Function responded in ${cfResult.seconds}s — it IS deployed and working.`
+                    : cfResult.error
+                    ? `❌ Error: ${cfResult.error}`
+                    : `❌ Cloud Function did NOT respond within 12 seconds. Deploy it with:\n\ncd functions && npm install && cd ..\nfirebase deploy --only functions`}
+                </div>
+              )}
+            </div>
+
+            {/* VAPID key instructions */}
+            <div className="border-t pt-4 mt-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">Vercel VAPID Key — Important</p>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-xs text-amber-800 space-y-1">
+                <p>• If Vercel shows the key as <b>"Sensitive"</b> (masked value), the key IS stored — Vercel just hides long secrets in the UI.</p>
+                <p>• However, Vite bakes env vars into the bundle <b>at build time</b>. If you added the key AFTER the last deploy, the running app doesn't have it yet.</p>
+                <p>• <b>Fix:</b> After adding or changing <code>VITE_FIREBASE_VAPID_KEY</code> in Vercel, you must trigger a new deployment (e.g. push a commit, or use Vercel Dashboard → Deployments → Redeploy).</p>
+                <p>• Run diagnostics above — if VAPID Key shows ❌, the env var is empty in the current build.</p>
+              </div>
+            </div>
+          </Card>
+
           <Card title="🔔 Test Push Notification">
             <p className="text-xs text-gray-400 mb-4">
-              Send a test push notification to all registered devices to verify FCM is configured and working.
-              All users who have accepted the notification permission will receive it.
+              Send a real test push to all registered devices. Use the diagnostics above first
+              to confirm FCM is working end-to-end.
             </p>
             <button onClick={sendTestNotif} disabled={notifSending}
               className="bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-50">
