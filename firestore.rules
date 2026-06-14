@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Main app data — all authenticated users
+    // Main app data
     match /gpp/{doc} {
       allow read, write: if request.auth != null;
     }
@@ -10,18 +10,19 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
-    // FCM device tokens — any authenticated user can write their own token.
-    // Reading is blocked for clients; Cloud Function uses Admin SDK which bypasses rules.
+    // FCM device tokens — authenticated users write their own token
+    // Cloud Function reads via Admin SDK (bypasses these rules)
     match /fcm_tokens/{tokenId} {
       allow write: if request.auth != null;
       allow read:  if false;
     }
 
-    // Notification requests — authenticated users create them,
-    // Cloud Function (Admin SDK) reads and deletes them.
+    // Notification requests — authenticated users create + read (for CF polling test)
+    // Only Admin SDK (Cloud Function) can delete
     match /notification_requests/{reqId} {
       allow create: if request.auth != null;
-      allow read, update, delete: if false;
+      allow read:   if request.auth != null;
+      allow update, delete: if false;
     }
   }
 }

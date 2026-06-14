@@ -365,7 +365,6 @@ export async function getFCMDiagnostics(userEmail) {
 
 // Test whether the Cloud Function is deployed by watching if a test doc gets deleted
 export async function testCloudFunction() {
-  const { addDoc, collection: col, getDoc: gDoc, doc: d, deleteDoc: dDoc } = await import('firebase/firestore');
   const testRef = await addDoc(collection(db, NOTIF_REQUESTS_COL), {
     title: 'CF Test',
     body: 'Cloud Function connectivity test',
@@ -374,15 +373,19 @@ export async function testCloudFunction() {
     _test: true,
     createdAt: Date.now(),
   });
-  // Wait up to 12 seconds for the CF to delete the document
-  for (let i = 0; i < 12; i++) {
+  // Poll up to 15 seconds — CF should pick it up and delete it
+  for (let i = 0; i < 15; i++) {
     await new Promise(r => setTimeout(r, 1000));
-    const snap = await getDoc(doc(db, NOTIF_REQUESTS_COL, testRef.id));
-    if (!snap.exists()) return { ok: true, seconds: i + 1 };
+    try {
+      const snap = await getDoc(doc(db, NOTIF_REQUESTS_COL, testRef.id));
+      if (!snap.exists()) return { ok: true, seconds: i + 1 };
+    } catch (e) {
+      return { ok: false, error: 'Firestore read error: ' + e.message };
+    }
   }
-  // CF didn't pick it up — clean up and report failure
+  // CF didn't respond — clean up and report
   try { await deleteDoc(doc(db, NOTIF_REQUESTS_COL, testRef.id)); } catch {}
-  return { ok: false, seconds: 12 };
+  return { ok: false, seconds: 15 };
 }
 
 // ─── Approval helpers ─────────────────────────────────────────────────────────
