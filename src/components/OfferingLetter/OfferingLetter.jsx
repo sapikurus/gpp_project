@@ -1,3 +1,4 @@
+import DateInput from '../../utils/DateInput.jsx';
 import { useState, useEffect } from 'react';
 import { useApp } from '../../App.jsx';
 import {
@@ -252,7 +253,11 @@ export default function OfferingLetter() {
   // Print in new window
   // ─────────────────────────────────────────────────────────────────────────────
   const printInNewWindow = (ol, lang = 'id') => {
-    const html = generateOLHtml(ol, co, rates, provs, lang);
+    // Merge banks into company so generateOLHtml can find them
+    const coWithBanks = { ...co, banks };
+    // Expose generator on window so the print window's toggle can call back
+    window._gppGenerateOL = (olDoc, l) => generateOLHtml(olDoc, coWithBanks, rates, provs, l);
+    const html = generateOLHtml(ol, coWithBanks, rates, provs, lang);
     const win = window.open('', '_blank', 'width=960,height=800,scrollbars=yes');
     if (!win) { alert('Pop-up blocked. Please allow pop-ups for this site.'); return; }
     win.document.write(html);
@@ -387,7 +392,7 @@ export default function OfferingLetter() {
                 {/* Letter Date */}
                 <div className="mb-3">
                   <Lbl>Letter Date</Lbl>
-                  <input type="date" value={form.olDate} onChange={e => set('olDate')(e.target.value)} className={inp}/>
+                  <DateInput value={form.olDate} onChange={set('olDate')} className={inp}/>
                 </div>
 
                 {/* Revision No */}
@@ -917,18 +922,21 @@ function generateOLHtml(data, company, rates, provs, lang = 'id') {
       </span>
     </div>
     <script>
-      const olData = ${JSON.stringify({ data, company: {name:company.name,address:company.address,npwp:company.npwp,banks:company.banks||[]}, rates, provs })};
+      // Store the OL document so we can re-render without re-opening
+      window._olDoc = ${JSON.stringify(data)};
+
       function switchLang(l) {
-        document.title = 'Switching...';
-        // Re-open with same data, different lang stored
-        sessionStorage.setItem('olPrintLang', l);
-        location.reload();
-      }
-      // On load, check if we need a different lang
-      const savedLang = sessionStorage.getItem('olPrintLang');
-      if (savedLang && savedLang !== '${lang}') {
-        sessionStorage.removeItem('olPrintLang');
-        // will be handled by button click on next reload
+        // Call back to the opener window which holds the generator function
+        const opener = window.opener;
+        if (opener && typeof opener._gppGenerateOL === 'function') {
+          const html = opener._gppGenerateOL(window._olDoc, l);
+          document.open();
+          document.write(html);
+          document.close();
+        } else {
+          // Opener was closed — show fallback message
+          alert('Please re-open the preview from the app to switch language.');
+        }
       }
     <\/script>`;
 

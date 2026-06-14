@@ -1,3 +1,4 @@
+import DateInput from '../../utils/DateInput.jsx';
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLang } from '../../utils/i18n.jsx';
@@ -54,7 +55,7 @@ const Field = ({ label, children, sub }) => (
 
 // Date input (unchanged)
 const DateInp = ({ value, onChange }) => (
-  <input type="date" value={value} onChange={e => onChange(e.target.value)}
+  <DateInput value={value} onChange={onChange}
     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 font-mono" />
 );
 

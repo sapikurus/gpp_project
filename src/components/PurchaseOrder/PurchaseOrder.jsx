@@ -1,3 +1,4 @@
+import DateInput from '../../utils/DateInput.jsx';
 import { useState, useEffect } from 'react';
 import { useApp } from '../../App.jsx';
 import { fetchCollection, createNumberedDoc, updateSubDoc, deleteSubDoc, POS_REF, getApproverEmails, sendApprovalEmail, getSubmitterEmail, requestPushNotification } from '../../firebase.js';
@@ -204,7 +205,7 @@ export default function PurchaseOrder() {
               <div className="bg-white rounded-xl shadow-sm p-5">
                 <h2 className="text-xs font-bold text-blue-700 uppercase tracking-widest mb-4">Detail PO</h2>
                 <div className="grid grid-cols-2 gap-4">
-                  <div><label className="block text-xs text-gray-500 mb-1">Tanggal PO</label><input type="date" value={form.poDate} onChange={e=>set('poDate')(e.target.value)} className={IF}/></div>
+                  <div><label className="block text-xs text-gray-500 mb-1">Tanggal PO</label><DateInput value={form.poDate} onChange={set('poDate')} className={IF}/></div>
                   <div><label className="block text-xs text-gray-500 mb-1">Ship To</label><input type="text" value={form.shipTo||''} onChange={e=>set('shipTo')(e.target.value)} placeholder="Lokasi pengiriman" className={IF}/></div>
                   <div className="col-span-2">
                     <label className="block text-xs text-gray-500 mb-1">Pilih Supplier</label>

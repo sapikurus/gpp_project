@@ -1,3 +1,4 @@
+import DateInput from '../../utils/DateInput.jsx';
 import { useState, useEffect } from 'react';
 import { useApp } from '../../App.jsx';
 import {
@@ -331,7 +332,7 @@ export default function SalesOrder() {
             <div className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div><label className="block text-xs text-gray-500 mb-1">Tanggal SO</label>
-                  <input type="date" value={form.soDate} onChange={e => set('soDate')(e.target.value)}
+                  <DateInput value={form.soDate} onChange={set('soDate')}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"/></div>
 
                 <div><label className="block text-xs text-gray-500 mb-1">Stok *</label>

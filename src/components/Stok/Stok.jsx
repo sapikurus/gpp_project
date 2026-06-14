@@ -1,3 +1,4 @@
+import DateInput from '../../utils/DateInput.jsx';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../App.jsx';
@@ -201,11 +202,11 @@ function TrancheModal({ tranche, rates, provs, pos, onSave, onClose }) {
             </div>
             <div>
               <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Load Date</label>
-              <input type="date" value={t.loadDate} onChange={e=>set('loadDate')(e.target.value)} className={IF}/>
+              <DateInput value={t.loadDate} onChange={set('loadDate')} className={IF}/>
             </div>
             <div>
               <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Pay Date (TOP ke supplier)</label>
-              <input type="date" value={t.payDate} onChange={e=>set('payDate')(e.target.value)} className={IF}/>
+              <DateInput value={t.payDate} onChange={set('payDate')} className={IF}/>
             </div>
             <div className="col-span-2">
               <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Province (PBBKB)</label>
@@ -290,7 +291,7 @@ function NewStockModal({ onSave, onClose }) {
             {[['etaLoad','ETA Loading'],['etaDisch','ETA Discharging']].map(([k,l]) => (
               <div key={k}>
                 <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{l}</label>
-                <input type="date" value={form[k]} onChange={set(k)} className={IF}/>
+                <DateInput value={form[k]} onChange={set(k)} className={IF}/>
               </div>
             ))}
           </div>
@@ -801,7 +802,7 @@ function EndCycleModal({ stock, tranches, rates, provs, onClose, onConfirm }) {
           {/* New cycle date */}
           <div>
             <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">New Cycle Date</label>
-            <input type="date" value={cycleDate} onChange={e=>setCycleDate(e.target.value)}
+            <DateInput value={cycleDate} onChange={setCycleDate}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"/>
             <p className="text-[10px] text-gray-400 mt-0.5">
               CoM calculated from avg load date ({avgLoadDate}) to this date: {daysHeld} days at {rates?.bankRate||6.5}% p.a.
