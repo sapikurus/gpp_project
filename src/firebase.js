@@ -91,13 +91,10 @@ export async function initPushNotifications(userEmail, userRole) {
 
 // Create a notification request document — Cloud Function picks this up and sends FCM
 export async function requestPushNotification({ title, body, url = '/', targetRoles = ['manager','director'] }) {
-  try {
-    await addDoc(collection(db, NOTIF_REQUESTS_COL), {
-      title, body, url, targetRoles, createdAt: Date.now(),
-    });
-  } catch (e) {
-    console.warn('Push notification request failed (non-blocking):', e.message);
-  }
+  // No try/catch — let errors propagate so callers can show the real error
+  await addDoc(collection(db, NOTIF_REQUESTS_COL), {
+    title, body, url, targetRoles, createdAt: Date.now(),
+  });
 }
 
 // Persist login across browser sessions

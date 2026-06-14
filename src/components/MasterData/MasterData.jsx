@@ -59,14 +59,26 @@ function Corporate() {
     email: appData?.company?.email || '',
   });
   const [branches, setBranches]   = useState(appData?.branches || []);
-  const [sign,     setSign]       = useState(appData?.signatories || {});
-  const [banks,    setBanks]      = useState(appData?.banks || (appData?.banking ? [{ ...appData.banking, id: '1', isPrimary: true }] : []));
+  const [sign, setSign] = useState(
+    // Migrate old single-field format to new list format
+    Array.isArray(appData?.signatories)
+      ? appData.signatories
+      : appData?.signatories?.preparedBy
+        ? [
+            { id: '1', name: appData.signatories.preparedBy, jabatan: '', role: 'staff' },
+            ...(appData.signatories.approvedBy ? [{ id: '2', name: appData.signatories.approvedBy, jabatan: 'Direktur', role: 'director' }] : []),
+          ]
+        : []
+  );
+
+  const addSignatory  = () => setSign(p => [...p, { id: Date.now().toString(), name: '', jabatan: '', role: 'director' }]);
+  const delSignatory  = id => setSign(p => p.filter(x => x.id !== id));
+  const updSignatory  = (id, k, v) => setSign(p => p.map(x => x.id === id ? { ...x, [k]: v } : x));  const [banks,    setBanks]      = useState(appData?.banks || (appData?.banking ? [{ ...appData.banking, id: '1', isPrimary: true }] : []));
   const [rates,    setRates]      = useState(appData?.rates || { ppn: 11, pph: 0.3, bphMigas: 0.25, bankRate: 6.5 });
   const [provinces,setProvinces]  = useState(appData?.pbbkbProvinces || []);
   const [newProv,  setNP]         = useState({ name: '', rate: '' });
 
   const sho = k => v => setHO(p => ({ ...p, [k]: v }));
-  const ss  = k => v => setSign(p => ({ ...p, [k]: v }));
   const sr  = k => v => setRates(p => ({ ...p, [k]: v }));
 
   const addBranch = () => setBranches(p => [...p, { id: Date.now().toString(), name: '', address: '', npwp: '', phone: '', email: '' }]);
@@ -82,9 +94,11 @@ function Corporate() {
     setSaving(true);
     try {
       await patchData({
-        headOffice, branches, signatories: sign, banks, rates, pbbkbProvinces: provinces,
-        company:  { name: headOffice.name, address1: headOffice.address, npwp: headOffice.npwp, phone: headOffice.phone, email: headOffice.email },
-        banking:  banks.find(b => b.isPrimary) || banks[0] || {},
+        headOffice, branches,
+        signatories: sign,   // now an array [{id, name, jabatan, role}]
+        banks, rates, pbbkbProvinces: provinces,
+        company: { name: headOffice.name, address1: headOffice.address, npwp: headOffice.npwp, phone: headOffice.phone, email: headOffice.email },
+        banking: banks.find(b => b.isPrimary) || banks[0] || {},
       });
       await reload(); setSaved(true); setTimeout(() => setSaved(false), 2500);
     } finally { setSaving(false); }
@@ -102,11 +116,18 @@ function Corporate() {
       {sub === 'general' && <>
         <Card title="🏢 Head Office">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <F label="Nama Perusahaan" value={headOffice.name    || ''} onChange={sho('name')} />
-            <F label="NPWP"           value={headOffice.npwp    || ''} onChange={sho('npwp')} />
-            <F label="Alamat"         value={headOffice.address || ''} onChange={sho('address')} />
-            <F label="Telepon"        value={headOffice.phone   || ''} onChange={sho('phone')} />
-            <F label="Email"          value={headOffice.email   || ''} onChange={sho('email')} />
+            <F label="Nama Perusahaan" value={headOffice.name || ''} onChange={sho('name')} />
+            <F label="NPWP"           value={headOffice.npwp || ''} onChange={sho('npwp')} />
+            {/* Multiline address */}
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1">Alamat</label>
+              <textarea value={headOffice.address || ''} onChange={e => sho('address')(e.target.value)}
+                rows={3} placeholder={"Jl. Central Raya No.17\nCentral Sukajadi, Batam\n29432"}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"/>
+              <p className="text-[10px] text-gray-400 mt-0.5">Each line will appear as a separate line in printed documents.</p>
+            </div>
+            <F label="Telepon" value={headOffice.phone || ''} onChange={sho('phone')} />
+            <F label="Email"   value={headOffice.email || ''} onChange={sho('email')} />
           </div>
         </Card>
 
@@ -125,13 +146,18 @@ function Corporate() {
                       <button onClick={() => delBranch(i)} className="text-red-400 hover:text-red-600 text-xs">✕ Hapus</button>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {[['name','Nama Cabang'],['address','Alamat'],['npwp','NPWP Cabang'],['phone','Telepon'],['email','Email']].map(([k, l]) => (
+                      {[['name','Nama Cabang'],['npwp','NPWP Cabang'],['phone','Telepon'],['email','Email']].map(([k, l]) => (
                         <div key={k}>
                           <label className="block text-xs text-gray-500 mb-1">{l}</label>
                           <input type="text" value={b[k] || ''} onChange={e => updBranch(i, k, e.target.value)}
                             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white" />
                         </div>
                       ))}
+                      <div className="md:col-span-2">
+                        <label className="block text-xs text-gray-500 mb-1">Alamat</label>
+                        <textarea value={b.address || ''} onChange={e => updBranch(i, 'address', e.target.value)}
+                          rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white resize-none"/>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -139,11 +165,64 @@ function Corporate() {
           }
         </Card>
 
-        <Card title="✍️ Penandatangan">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <F label="Prepared By"      value={sign.preparedBy   || ''} onChange={ss('preparedBy')} />
-            <F label="Approved By"      value={sign.approvedBy   || ''} onChange={ss('approvedBy')} />
-            <F label="Petugas Lapangan" value={sign.fieldOfficer || ''} onChange={ss('fieldOfficer')} />
+        <Card title="✍️ Signatories" action={
+          <button onClick={addSignatory} className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-100 font-medium">
+            + Add Signatory
+          </button>
+        }>
+          <div className="text-xs text-gray-400 mb-4 space-y-1">
+            <p>Store the names and titles of authorized signatories for printed documents (OL, PO, SO, DO).</p>
+            <p><b>How it works:</b> When printing a document, the system picks the signatory whose <b>Role</b> matches the document context — the preparing staff's name goes in "Prepared by", the director's name goes in "Approved by".</p>
+          </div>
+
+          {sign.length === 0
+            ? <p className="text-gray-400 text-xs italic text-center py-4">No signatories yet. Add at least one Director.</p>
+            : (
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    {['Full Name','Jabatan / Title','Role',''].map(h => (
+                      <th key={h} className="text-left px-3 py-2.5 text-xs font-semibold text-gray-500">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {sign.map(s => (
+                    <tr key={s.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2">
+                        <input type="text" value={s.name || ''} onChange={e => updSignatory(s.id, 'name', e.target.value)}
+                          placeholder="e.g. Nico Yonathan"
+                          className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"/>
+                      </td>
+                      <td className="px-3 py-2">
+                        <input type="text" value={s.jabatan || ''} onChange={e => updSignatory(s.id, 'jabatan', e.target.value)}
+                          placeholder="e.g. Direktur"
+                          className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"/>
+                      </td>
+                      <td className="px-3 py-2">
+                        <select value={s.role || 'director'} onChange={e => updSignatory(s.id, 'role', e.target.value)}
+                          className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white">
+                          <option value="superadmin">Super Admin</option>
+                          <option value="director">Director</option>
+                          <option value="manager">Manager</option>
+                          <option value="staff">Staff</option>
+                        </select>
+                      </td>
+                      <td className="px-3 py-2">
+                        <button onClick={() => delSignatory(s.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="mt-4 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-xs text-blue-700 space-y-1">
+            <p><b>"Prepared by"</b> on printed docs → auto-filled from the logged-in user's matching signatory entry (matched by their role). If no match, shows their email.</p>
+            <p><b>"Approved by"</b> → always uses the Director or Super Admin signatory entry.</p>
+            <p><b>Petugas Lapangan</b> → input directly on each Delivery Order — no need to store here.</p>
           </div>
         </Card>
       </>}
@@ -883,9 +962,10 @@ function Settings() {
         url: '/',
         targetRoles: ['staff','manager','director','superadmin'],
       });
-      setNotifResult('✅ Test notification sent. It will arrive within a few seconds if FCM is configured.');
-    } catch(e) { setNotifResult('❌ Failed: ' + e.message); }
-    finally { setNotifSending(false); }
+      setNotifResult('✅ Request created in Firestore. Notification will arrive in a few seconds.');
+    } catch(e) {
+      setNotifResult(`❌ Failed to create request: ${e.message} — Have you deployed the Firestore rules? Run: firebase deploy --only firestore:rules`);
+    } finally { setNotifSending(false); }
   };
 
   const sendCustomNotif = async () => {
@@ -898,10 +978,11 @@ function Settings() {
         ? ['manager','director','superadmin']
         : ['director','superadmin'];
       await requestPushNotification({ title: notifTitle.trim(), body: notifBody.trim(), url: '/', targetRoles });
-      setNotifResult(`✅ Notification sent to ${notifTarget === 'all' ? 'all users' : notifTarget}.`);
+      setNotifResult(`✅ Broadcast request created. Notification will arrive in a few seconds.`);
       setNotifTitle(''); setNotifBody('');
-    } catch(e) { setNotifResult('❌ Failed: ' + e.message); }
-    finally { setNotifSending(false); }
+    } catch(e) {
+      setNotifResult(`❌ Failed: ${e.message} — Have you deployed the Firestore rules? Run: firebase deploy --only firestore:rules`);
+    } finally { setNotifSending(false); }
   };
   const [msg, setMsg] = useState('');
   const [userRoles, setUserRoles] = useState(appData?.userRoles || {});

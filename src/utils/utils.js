@@ -152,3 +152,27 @@ export const runCalculation = (form) => {
     sellPrice, totalCostPerL, totalCost, marginPerL, marginPct, totalProfit,
   };
 };
+
+// ─── Signatory helpers ────────────────────────────────────────────────────────
+// Pick a signatory from the list that matches a given role.
+// Falls back to any director/superadmin, then first entry.
+export const getSignatoryByRole = (signatories, role) => {
+  if (!Array.isArray(signatories) || signatories.length === 0) return null;
+  return (
+    signatories.find(s => s.role === role) ||
+    signatories.find(s => s.role === 'director' || s.role === 'superadmin') ||
+    signatories[0]
+  );
+};
+
+// Returns { preparedBy: {name, jabatan}, approvedBy: {name, jabatan} }
+// preparedByRole = role of the current user (who prepared the document)
+export const getSignatureBlock = (signatories, preparedByRole = 'staff') => {
+  const sigs = Array.isArray(signatories) ? signatories : [];
+  const prepared = getSignatoryByRole(sigs, preparedByRole) || { name: '', jabatan: '' };
+  const approved = sigs.find(s => s.role === 'director' || s.role === 'superadmin') || { name: '', jabatan: 'Direktur' };
+  return {
+    preparedBy: { name: prepared.name || '', jabatan: prepared.jabatan || '' },
+    approvedBy: { name: approved.name || '', jabatan: approved.jabatan || 'Direktur' },
+  };
+};
