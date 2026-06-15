@@ -14,16 +14,23 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 // Handle background messages (app is closed or in background)
+// NOTE: When FCM payload has a 'notification' field, Chrome may show it automatically.
+// onBackgroundMessage handles the case where we need to construct the display ourselves.
 messaging.onBackgroundMessage(payload => {
-  const { title, body } = payload.notification || {};
-  const data = payload.data || {};
+  // Support both notification field and data-only payloads
+  const title = (payload.notification && payload.notification.title)
+    || (payload.data && payload.data.title) || '';
+  const body  = (payload.notification && payload.notification.body)
+    || (payload.data && payload.data.body)  || '';
+  const data  = payload.data || {};
   if (!title) return;
   self.registration.showNotification(title, {
     body,
-    icon: '/favicon.png',
+    icon:  '/favicon.png',
     badge: '/favicon.png',
-    tag: data.tag || 'gpp-notification',
-    data: { url: data.url || '/' },
+    tag:   data.tag || 'gpp-notification',
+    requireInteraction: false,
+    data:  { url: data.url || '/' },
   });
 });
 

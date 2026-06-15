@@ -74,13 +74,30 @@ export async function initPushNotifications(userEmail, userRole) {
       token, email: userEmail, role: userRole, updatedAt: Date.now(),
     });
 
-    // Listen for foreground messages
+    // Foreground message handler — must use SW showNotification, NOT new Notification()
+    // because new Notification() is not supported on Android Chrome
     try {
-      onMessage(getMsg(), payload => {
-        const { title, body } = payload.notification || {};
-        if (title) new Notification(title, { body, icon: '/favicon.png' });
+      onMessage(getMsg(), async payload => {
+        const title = payload.notification?.title || payload.data?.title || '';
+        const body  = payload.notification?.body  || payload.data?.body  || '';
+        const url   = payload.data?.url || '/';
+        if (!title) return;
+        // Get the FCM service worker registration and use it to show the notification
+        const regs = await navigator.serviceWorker.getRegistrations();
+        const fcmSW = regs.find(r => r.active?.scriptURL?.includes('firebase-messaging-sw'));
+        if (fcmSW) {
+          fcmSW.showNotification(title, {
+            body,
+            icon:  '/favicon.png',
+            badge: '/favicon.png',
+            tag:   'gpp-foreground',
+            data:  { url },
+          });
+        }
       });
-    } catch {} // Non-critical
+    } catch (e) {
+      console.warn('onMessage setup failed (non-critical):', e.message);
+    }
 
     return { ok: true };
   } catch(e) {
