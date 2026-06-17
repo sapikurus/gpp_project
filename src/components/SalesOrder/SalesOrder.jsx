@@ -255,6 +255,12 @@ export default function SalesOrder() {
                 <div className="flex gap-2 border-t pt-3">
                   <button onClick={() => setShowDetail(so)} className="flex-1 text-sm text-blue-700 border border-blue-200 py-2 rounded-lg hover:bg-blue-50 font-medium">Detail & Approval</button>
                   <button onClick={() => setPrinting(so)} className="px-3 py-2 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50">🖨️</button>
+                  {isApproved(so.approvalStatus) && (
+                    <a href="/invoice" onClick={e => { e.preventDefault(); window.location.href = `/invoice?soId=${so.id}`; }}
+                      className="px-3 py-2 border border-green-200 bg-green-50 rounded-lg text-xs text-green-700 hover:bg-green-100 font-semibold">
+                      🧾 Invoice
+                    </a>
+                  )}
                   {isEditable(so.approvalStatus) && <button onClick={() => openEdit(so)} className="px-3 py-2 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50">✏️</button>}
                   {canDelete(userRole) && <button onClick={() => remove(so.id)} className="px-3 py-2 border border-red-100 rounded-lg text-xs text-red-400 hover:bg-red-50">🗑️</button>}
                 </div>

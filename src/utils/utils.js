@@ -59,6 +59,10 @@ export const autoPeriod = () => {
 export const buildPONumber  = (seq,m,y) => `${String(seq).padStart(2,'0')}/PO-GPP/${toRoman(m)}/${y}`;
 export const buildDONumber  = (seq,m,y) => `${String(seq).padStart(3,'0')}/DO-GPP/${toRoman(m)}/${y}`;
 export const buildBDRNumber = (seq,m,y) => `${String(seq).padStart(3,'0')}/BDR-GPP/${toRoman(m)}/${y}`;
+// Invoice: GP005/INV/BBM/V/2026  — cat: BBM (fuel) | GEN (general)
+export const buildINVNumber = (seq, cat, m, y) =>
+  `GP${String(seq).padStart(3,'0')}/INV/${(cat||'GEN').toUpperCase()}/${toRoman(m)}/${y}`;
+
 export const buildOLNumber  = (seq,m,y) => `${String(seq).padStart(3,'0')}/SP-GPP/${toRoman(m)}/${y}`;
 // New SPH format: 001/SPH/GPP/CLIENTCODE/V/2026
 export const buildSPHNumber = (seq, clientCode, m, y) =>

@@ -76,6 +76,7 @@ export default function Sidebar() {
     { to:'/calculator',      label:t('nav_calculator'),      icon:'🧮' },
     { to:'/offering-letter', label:t('nav_offering_letter'), icon:'📄' },
     { to:'/sales-order',     label:t('nav_sales_order'),     icon:'🤝' },
+    { to:'/invoice',         label:'Invoice',                 icon:'🧾' },
     { to:'/purchase-order',  label:t('nav_purchase_order'),  icon:'📋' },
     { to:'/delivery-order',  label:t('nav_delivery_order'),  icon:'🚢' },
     { to:'/mops',            label:t('nav_mops'),            icon:'📈' },

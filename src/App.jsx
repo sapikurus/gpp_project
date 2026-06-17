@@ -10,6 +10,7 @@ import Stok           from './components/Stok/Stok.jsx';
 import Calculator     from './components/Calculator/Calculator.jsx';
 import OfferingLetter from './components/OfferingLetter/OfferingLetter.jsx';
 import SalesOrder     from './components/SalesOrder/SalesOrder.jsx';
+import Invoice        from './components/Invoice/Invoice.jsx';
 import PurchaseOrder  from './components/PurchaseOrder/PurchaseOrder.jsx';
 import DeliveryOrder  from './components/DeliveryOrder/DeliveryOrder.jsx';
 import MopsData       from './components/MopsData/MopsData.jsx';
@@ -97,6 +98,7 @@ export default function App() {
             <Route path="/calculator"      element={<Calculator />} />
             <Route path="/offering-letter" element={<OfferingLetter />} />
             <Route path="/sales-order"     element={<SalesOrder />} />
+            <Route path="/invoice"         element={<Invoice />} />
             <Route path="/purchase-order"  element={<PurchaseOrder />} />
             <Route path="/delivery-order"  element={<DeliveryOrder />} />
             <Route path="/mops"            element={<MopsData />} />

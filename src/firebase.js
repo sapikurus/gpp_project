@@ -138,6 +138,7 @@ export const CALCS_REF  = () => collection(db, 'gpp', 'data', 'calculations');
 export const OLS_REF    = () => collection(db, 'gpp', 'data', 'offeringLetters');
 export const STOCKS_REF = () => collection(db, 'gpp', 'data', 'stocks');
 export const SOS_REF    = () => collection(db, 'gpp', 'data', 'salesOrders');
+export const INVS_REF   = () => collection(db, 'gpp', 'data', 'invoices');
 // Legacy alias — keep for any existing data
 export const CARGOS_REF = STOCKS_REF;
 
