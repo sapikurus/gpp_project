@@ -1047,6 +1047,8 @@ function Settings() {
       manager: DEFAULT_ROLE_MENU.manager.filter(r => r !== '/'),
     });
   };
+
+  const saveUsers = async () => { setSavingUsers(true); try{await patchField('userRoles',userRoles);await reload();setSavedUsers(true);setTimeout(()=>setSavedUsers(false),2500);}finally{setSavingUsers(false);} };
   const toggleChainRole = (dt,role) => setChains(p=>{const cur=p[dt]||[];const has=cur.includes(role);let next=has?cur.filter(r=>r!==role):[...cur,role];next=CHAIN_ROLES.filter(r=>next.includes(r));if(next.length===0)next=['director'];return{...p,[dt]:next};});
   const saveChain = async () => { setSavingChain(true); try{await patchField('settings',{...(appData?.settings||{}),approvalChain:chains});await reload();setSavedChain(true);setTimeout(()=>setSavedChain(false),2500);}finally{setSavingChain(false);} };
   const saveEndpoint = async () => { setSavingEP(true); try{await patchField('settings',{...(appData?.settings||{}),mopsEndpoint:endpoint});await reload();setSavedEP(true);setTimeout(()=>setSavedEP(false),2500);}finally{setSavingEP(false);} };
