@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { logout, changePassword, initPushNotifications } from '../../firebase.js';
 import { useApp } from '../../App.jsx';
-import { canSeeMasterData, ROLE_MENU } from '../../utils/approvalUtils.js';
+import { canSeeMasterData, getEffectiveMenu } from '../../utils/approvalUtils.js';
 import logo from '../../assets/gpp-logo.png';
 
 const ROLE_LABELS = {
@@ -69,7 +69,7 @@ export default function Sidebar() {
     } finally { setPwSaving(false); }
   };
 
-  const allowedRoutes = ROLE_MENU[userRole] || ROLE_MENU.staff;
+  const allowedRoutes = getEffectiveMenu(appData?.settings, userRole);
   const ALL_NAV = [
     { to:'/',                label:t('nav_dashboard'),       icon:'🏠' },
     { to:'/stok',            label:t('nav_stock'),           icon:'📦' },

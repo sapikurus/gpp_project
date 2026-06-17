@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { useApp } from '../../App.jsx';
 import { patchField, patchData, exportBackup, importBackup, requestPushNotification, getFCMDiagnostics, testCloudFunction } from '../../firebase.js';
+import { ALL_CONFIGURABLE_ROUTES, DEFAULT_ROLE_MENU } from '../../utils/approvalUtils.js';
 import * as XLSX from 'xlsx';
 
 const F = ({ label, value, onChange, type = 'text', placeholder = '', step }) => (
@@ -1002,7 +1003,50 @@ function Settings() {
 
   const addUser = () => { if(!newEmail)return; setUserRoles(p=>({...p,[newEmail.toLowerCase()]:newRole})); setNewEmail(''); setNewRole('staff'); };
   const removeUser = email => setUserRoles(p=>{const c={...p};delete c[email];return c;});
-  const saveUsers = async () => { setSavingUsers(true); try{await patchField('userRoles',userRoles);await reload();setSavedUsers(true);setTimeout(()=>setSavedUsers(false),2500);}finally{setSavingUsers(false);} };
+  // Role visibility state
+  // Only staff and manager are configurable — director/superadmin always have full access
+  const buildInitialPerms = () => {
+    const saved = appData?.settings?.rolePermissions || {};
+    const result = {};
+    ['staff','manager'].forEach(role => {
+      const savedRoutes = saved[role];
+      const defaults = DEFAULT_ROLE_MENU[role] || [];
+      result[role] = Array.isArray(savedRoutes)
+        ? savedRoutes
+        : defaults.filter(r => r !== '/');
+    });
+    return result;
+  };
+  const [rolePerms,     setRolePerms]     = useState(buildInitialPerms);
+  const [savingPerms,   setSavingPerms]   = useState(false);
+  const [savedPerms,    setSavedPerms]    = useState(false);
+
+  const togglePerm = (role, route) => {
+    setRolePerms(p => {
+      const current = p[role] || [];
+      const next = current.includes(route)
+        ? current.filter(r => r !== route)
+        : [...current, route];
+      return { ...p, [role]: next };
+    });
+  };
+
+  const savePerms = async () => {
+    setSavingPerms(true);
+    try {
+      await patchField('settings', { ...(appData?.settings || {}), rolePermissions: rolePerms });
+      await reload();
+      setSavedPerms(true);
+      setTimeout(() => setSavedPerms(false), 2500);
+    } finally { setSavingPerms(false); }
+  };
+
+  const resetPerms = () => {
+    setRolePerms({
+      staff:   DEFAULT_ROLE_MENU.staff.filter(r => r !== '/'),
+      manager: DEFAULT_ROLE_MENU.manager.filter(r => r !== '/'),
+    });
+  };
   const toggleChainRole = (dt,role) => setChains(p=>{const cur=p[dt]||[];const has=cur.includes(role);let next=has?cur.filter(r=>r!==role):[...cur,role];next=CHAIN_ROLES.filter(r=>next.includes(r));if(next.length===0)next=['director'];return{...p,[dt]:next};});
   const saveChain = async () => { setSavingChain(true); try{await patchField('settings',{...(appData?.settings||{}),approvalChain:chains});await reload();setSavedChain(true);setTimeout(()=>setSavedChain(false),2500);}finally{setSavingChain(false);} };
   const saveEndpoint = async () => { setSavingEP(true); try{await patchField('settings',{...(appData?.settings||{}),mopsEndpoint:endpoint});await reload();setSavedEP(true);setTimeout(()=>setSavedEP(false),2500);}finally{setSavingEP(false);} };
@@ -1014,6 +1058,126 @@ function Settings() {
 
   return (
     <div>
+      {/* Role Visibility — Director/Superadmin only */}
+      {isDirector && (
+        <Card title="👁 Role Visibility">
+          <p className="text-xs text-gray-400 mb-1">
+            Control which sidebar menus are visible to each role.
+            Dashboard is always visible. Director and Super Admin always have full access and cannot be restricted.
+          </p>
+          <div className="flex items-center justify-between mb-4">
+            <button onClick={resetPerms} className="text-xs text-gray-400 hover:text-gray-700 underline">
+              Reset to defaults
+            </button>
+            <button onClick={savePerms} disabled={savingPerms}
+              className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-50">
+              {savingPerms ? '⏳' : savedPerms ? '✅ Saved' : '💾 Save Permissions'}
+            </button>
+          </div>
+
+          <div className="border border-gray-200 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 w-48">Menu</th>
+                  {/* Superadmin — always locked */}
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-purple-600 w-28">
+                    Super Admin
+                    <p className="font-normal text-[10px] text-gray-400 mt-0.5">always full</p>
+                  </th>
+                  {/* Director — always locked */}
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-blue-700 w-28">
+                    Director
+                    <p className="font-normal text-[10px] text-gray-400 mt-0.5">always full</p>
+                  </th>
+                  {/* Manager — configurable */}
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-green-700 w-28">
+                    Manager
+                    <p className="font-normal text-[10px] text-green-600 mt-0.5">configurable</p>
+                  </th>
+                  {/* Staff — configurable */}
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-600 w-28">
+                    Staff
+                    <p className="font-normal text-[10px] text-green-600 mt-0.5">configurable</p>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {/* Dashboard — always visible for all */}
+                <tr className="bg-gray-50">
+                  <td className="px-4 py-3 text-xs text-gray-400 italic">Dashboard (always visible)</td>
+                  {['superadmin','director','manager','staff'].map(role => (
+                    <td key={role} className="text-center px-4 py-3">
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-green-100 text-green-600 text-xs">✓</span>
+                    </td>
+                  ))}
+                </tr>
+
+                {ALL_CONFIGURABLE_ROUTES.map(({ to, label, icon }) => {
+                  const isMasterData = to === '/master-data';
+                  return (
+                    <tr key={to} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <span className="mr-2">{icon}</span>
+                        <span className="text-gray-800 text-sm">{label}</span>
+                      </td>
+
+                      {/* Superadmin — always on, locked */}
+                      <td className="text-center px-4 py-3">
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-green-100 text-green-600 text-xs">✓</span>
+                      </td>
+
+                      {/* Director — always on, locked */}
+                      <td className="text-center px-4 py-3">
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-green-100 text-green-600 text-xs">✓</span>
+                      </td>
+
+                      {/* Manager — configurable (Master Data special: always off for manager) */}
+                      <td className="text-center px-4 py-3">
+                        {isMasterData ? (
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-gray-100 text-gray-400 text-xs" title="Master Data is always restricted to Director+">–</span>
+                        ) : (
+                          <button
+                            onClick={() => togglePerm('manager', to)}
+                            className={`inline-flex items-center justify-center w-6 h-6 rounded-md border-2 transition-colors cursor-pointer ${
+                              (rolePerms.manager || []).includes(to)
+                                ? 'bg-blue-600 border-blue-600 text-white'
+                                : 'bg-white border-gray-300 text-transparent hover:border-blue-400'
+                            }`}>
+                            ✓
+                          </button>
+                        )}
+                      </td>
+
+                      {/* Staff — configurable */}
+                      <td className="text-center px-4 py-3">
+                        {isMasterData ? (
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-gray-100 text-gray-400 text-xs" title="Master Data is always restricted to Director+">–</span>
+                        ) : (
+                          <button
+                            onClick={() => togglePerm('staff', to)}
+                            className={`inline-flex items-center justify-center w-6 h-6 rounded-md border-2 transition-colors cursor-pointer ${
+                              (rolePerms.staff || []).includes(to)
+                                ? 'bg-blue-600 border-blue-600 text-white'
+                                : 'bg-white border-gray-300 text-transparent hover:border-blue-400'
+                            }`}>
+                            ✓
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-3 bg-amber-50 border border-amber-100 rounded-lg px-4 py-3 text-xs text-amber-700">
+            Changes take effect immediately after saving — users will see the updated menus on their next page load or app refresh.
+          </div>
+        </Card>
+      )}
+
       <Card title="👥 Users & Roles">
         <p className="text-xs text-gray-400 mb-4">Atur role setiap pengguna. Email harus terdaftar di Firebase Authentication.</p>
         <div className="flex gap-2 mb-4 flex-wrap">

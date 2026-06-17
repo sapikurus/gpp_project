@@ -69,13 +69,40 @@ export const canSeeMasterData = (role) =>
 export const canDelete = (role) =>
   role === 'director' || role === 'superadmin' || role === 'manager';
 
-// Menu access per role
-export const ROLE_MENU = {
+// All configurable routes (Dashboard '/' is always visible — not listed here)
+export const ALL_CONFIGURABLE_ROUTES = [
+  { to: '/stok',           label: 'Stok / Cargo',     icon: '📦' },
+  { to: '/calculator',     label: 'Calculator',        icon: '🧮' },
+  { to: '/offering-letter',label: 'Offering Letter',   icon: '📄' },
+  { to: '/sales-order',    label: 'Sales Order',       icon: '🤝' },
+  { to: '/invoice',        label: 'Invoice',           icon: '🧾' },
+  { to: '/purchase-order', label: 'Purchase Order',    icon: '🛒' },
+  { to: '/delivery-order', label: 'Delivery Order',    icon: '🚢' },
+  { to: '/mops',           label: 'MOPS Data',         icon: '📊' },
+  { to: '/master-data',    label: 'Master Data',       icon: '⚙️' },
+];
+
+// Default menu per role (used when no custom settings saved yet)
+export const DEFAULT_ROLE_MENU = {
   superadmin: ['/', '/stok', '/calculator', '/offering-letter', '/sales-order', '/invoice', '/purchase-order', '/delivery-order', '/mops', '/master-data'],
   director:   ['/', '/stok', '/calculator', '/offering-letter', '/sales-order', '/invoice', '/purchase-order', '/delivery-order', '/mops', '/master-data'],
   manager:    ['/', '/stok', '/calculator', '/offering-letter', '/sales-order', '/invoice', '/purchase-order', '/delivery-order', '/mops'],
   staff:      ['/', '/stok', '/calculator', '/offering-letter', '/sales-order', '/invoice', '/purchase-order', '/delivery-order', '/mops'],
 };
+
+// Superadmin and director always get full access regardless of settings
+const SUPER_ROLES = ['superadmin', 'director'];
+
+// Get the effective allowed routes for a role, merging Firestore settings with defaults
+export const getEffectiveMenu = (settings, userRole) => {
+  if (SUPER_ROLES.includes(userRole)) return DEFAULT_ROLE_MENU[userRole] || DEFAULT_ROLE_MENU.superadmin;
+  const custom = settings?.rolePermissions?.[userRole];
+  if (Array.isArray(custom)) return ['/', ...custom]; // always include dashboard
+  return DEFAULT_ROLE_MENU[userRole] || DEFAULT_ROLE_MENU.staff;
+};
+
+// Keep ROLE_MENU as alias for backward compatibility
+export const ROLE_MENU = DEFAULT_ROLE_MENU;
 
 export const canAccessRoute = (role, path) => {
   const allowed = ROLE_MENU[role] || ROLE_MENU.staff;
