@@ -13,7 +13,7 @@ const ROLE_LABELS = {
 };
 
 export default function Sidebar() {
-  const { user, userRole, lang, toggleLang, t } = useApp();
+  const { appData, user, userRole, lang, toggleLang, t } = useApp();
   const location = useLocation();
   const isMasterActive = location.pathname.startsWith('/master-data');
   const [masterOpen,  setMasterOpen]  = useState(isMasterActive);
