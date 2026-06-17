@@ -66,9 +66,41 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto pt-14 md:pt-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">{t('nav_dashboard')}</h1>
-        <p className="text-gray-500 text-sm mt-1">{t('desc_dashboard')}</p>
+      {/* Greeting header */}
+      <div className="flex items-start justify-between mb-5">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">
+            {new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening'} 👋
+          </h1>
+          <p className="text-gray-400 text-sm mt-0.5">
+            {new Date().toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}
+          </p>
+        </div>
+        {pendingItems.length > 0 && (
+          <span className="bg-amber-100 text-amber-700 text-sm font-semibold px-3 py-1.5 rounded-full border border-amber-200">
+            ⏳ {pendingItems.length} pending
+          </span>
+        )}
+      </div>
+
+      {/* Quick actions */}
+      <div className="grid grid-cols-4 md:grid-cols-8 gap-2 mb-6">
+        {[
+          { icon:'📦', label:'New Cargo',    action: () => nav('/stok') },
+          { icon:'🤝', label:'New SO',       action: () => nav('/sales-order') },
+          { icon:'🧾', label:'New Invoice',  action: () => nav('/invoice') },
+          { icon:'🛒', label:'New PO',       action: () => nav('/purchase-order') },
+          { icon:'🚢', label:'New DO',       action: () => nav('/delivery-order') },
+          { icon:'📄', label:'New Offering', action: () => nav('/offering-letter') },
+          { icon:'🧮', label:'Calculator',   action: () => nav('/calculator') },
+          { icon:'📈', label:'MOPS Data',    action: () => nav('/mops') },
+        ].map(({ icon, label, action }) => (
+          <button key={label} onClick={action}
+            className="flex flex-col items-center gap-1.5 bg-white border border-gray-200 rounded-xl py-3 px-2 hover:border-blue-300 hover:bg-blue-50 transition-colors group">
+            <span className="text-xl">{icon}</span>
+            <span className="text-[10px] text-gray-500 group-hover:text-blue-700 font-medium text-center leading-tight">{label}</span>
+          </button>
+        ))}
       </div>
 
       {/* Pending tasks */}
@@ -148,7 +180,13 @@ export default function Dashboard() {
             <button onClick={() => nav('/stok')} className="text-blue-600 text-xs hover:underline">{t('dash_view_all')}</button>
           </div>
           {loading ? <p className="text-gray-400 text-sm">{t('dash_loading')}</p> :
-           confirmedStocks.length === 0 ? <p className="text-gray-400 text-sm">{t('dash_no_stock')}</p> : (
+           confirmedStocks.length === 0 ? (
+            <div className="text-center py-6 text-gray-400">
+              <p className="text-3xl mb-2">📦</p>
+              <p className="text-sm">No confirmed cargo yet</p>
+              <button onClick={() => nav('/stok')} className="mt-2 text-xs text-blue-600 hover:underline">Create first position →</button>
+            </div>
+           ) : (
             <div className="space-y-3">
               {confirmedStocks.slice(0,4).map(s => {
                 const avail = Math.max(0,(s.totalVolume||0)-(s.committedVolume||0));
@@ -177,7 +215,13 @@ export default function Dashboard() {
             <button onClick={() => nav('/sales-order')} className="text-blue-600 text-xs hover:underline">{t('dash_view_all')}</button>
           </div>
           {loading ? <p className="text-gray-400 text-sm">{t('dash_loading')}</p> :
-           sos.length === 0 ? <p className="text-gray-400 text-sm">{t('dash_no_so')}</p> : (
+           sos.length === 0 ? (
+            <div className="text-center py-6 text-gray-400">
+              <p className="text-3xl mb-2">🤝</p>
+              <p className="text-sm">No sales orders yet</p>
+              <button onClick={() => nav('/sales-order')} className="mt-2 text-xs text-blue-600 hover:underline">Create first SO →</button>
+            </div>
+           ) : (
             <div className="space-y-2">
               {sos.slice(0,5).map(s => {
                 const m = statusMeta(s.approvalStatus);

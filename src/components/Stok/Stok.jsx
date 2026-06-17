@@ -430,7 +430,7 @@ export default function Stok() {
   };
 
   return (
-    <div className="flex h-full pt-14 md:pt-0 overflow-hidden">
+    <div className="flex flex-col h-full pt-14 md:pt-0 overflow-hidden">
 
       {/* Modals */}
       {showNewStock && <NewStockModal onSave={createStock} onClose={() => setShowNewStock(false)} />}
@@ -504,53 +504,57 @@ export default function Stok() {
         </div>
       )}
 
-      {/* ── Left panel: Stock list ── */}
-      <div className="no-print w-64 shrink-0 border-r border-gray-200 bg-gray-50 flex flex-col overflow-hidden">
-        <div className="px-4 pt-4 pb-2 border-b border-gray-200">
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Cargo Positions</p>
+      {/* ── Top bar: Cargo position cards (horizontally scrollable) ── */}
+      <div className="no-print shrink-0 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center gap-3 px-4 py-2 overflow-x-auto">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest shrink-0">Cargo Positions</p>
           <button onClick={() => setShowNewStock(true)}
-            className="w-full bg-blue-700 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-800">
+            className="shrink-0 bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 whitespace-nowrap">
             + New Position
           </button>
-        </div>
-        <div className="flex-1 overflow-y-auto py-2 px-2">
-          {loading ? <p className="text-xs text-gray-400 p-3">Memuat…</p> :
-           stocks.length === 0 ? <p className="text-xs text-gray-400 p-3 italic">Belum ada stok.</p> :
-           stocks.map(s => {
-             const { blended: b, totalVol: tv } = calcBlended(s.tranches||[], rates, provs);
-             const isActive = s.id === selectedId;
-             return (
-               <div key={s.id} onClick={() => setSelectedId(s.id)}
-                 className={`rounded-xl p-3 mb-1.5 cursor-pointer transition-colors ${
-                   isActive ? 'bg-blue-700 text-white' : 'bg-white border border-gray-100 hover:border-blue-200'
-                 }`}>
-                 <div className="flex items-start justify-between">
-                   <p className={`text-xs font-bold leading-tight ${isActive?'text-white':'text-gray-800'}`}>{s.label}</p>
-                   {canDelete(userRole) && (
-                     <button onClick={e => { e.stopPropagation(); deleteStock(s.id); }}
-                       className={`text-[10px] ml-1 shrink-0 ${isActive?'text-blue-200 hover:text-white':'text-gray-300 hover:text-red-400'}`}>✕</button>
-                   )}
-                 </div>
-                 <p className={`text-[10px] mt-0.5 ${isActive?'text-blue-200':'text-gray-400'}`}>
-                   {(s.tranches||[]).length} tranches · {fmtV(tv)}
-                 </p>
-                 {b > 0 && <p className={`text-xs font-mono font-semibold mt-1 ${isActive?'text-blue-100':'text-blue-600'}`}>
-                   {new Intl.NumberFormat('id-ID').format(Math.round(b))}/L
-                 </p>}
-               </div>
-             );
-           })
+          {loading
+            ? <p className="text-xs text-gray-400 italic shrink-0">Loading…</p>
+            : stocks.length === 0
+            ? <p className="text-xs text-gray-400 italic shrink-0">No cargo positions yet.</p>
+            : stocks.map(s => {
+                const { blended: b, totalVol: tv } = calcBlended(s.tranches||[], rates, provs);
+                const isActive = s.id === selectedId;
+                return (
+                  <div key={s.id} onClick={() => setSelectedId(s.id)}
+                    className={`shrink-0 rounded-xl px-4 py-2.5 cursor-pointer transition-colors border min-w-[160px] relative group ${
+                      isActive
+                        ? 'bg-blue-700 text-white border-blue-700'
+                        : 'bg-white border-gray-200 hover:border-blue-300'
+                    }`}>
+                    <p className={`text-xs font-bold leading-tight ${isActive?'text-white':'text-gray-800'}`}>{s.label}</p>
+                    <p className={`text-[10px] mt-0.5 ${isActive?'text-blue-200':'text-gray-400'}`}>
+                      {(s.tranches||[]).length} tranches · {fmtV(tv)}
+                    </p>
+                    {b > 0 && (
+                      <p className={`text-xs font-mono font-semibold mt-1 ${isActive?'text-blue-100':'text-blue-600'}`}>
+                        {new Intl.NumberFormat('id-ID').format(Math.round(b))}/L
+                      </p>
+                    )}
+                    {canDelete(userRole) && (
+                      <button onClick={e => { e.stopPropagation(); deleteStock(s.id); }}
+                        className={`absolute top-1.5 right-1.5 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity ${
+                          isActive?'text-blue-200 hover:text-white':'text-gray-300 hover:text-red-500'
+                        }`}>✕</button>
+                    )}
+                  </div>
+                );
+              })
           }
         </div>
       </div>
 
-      {/* ── Right panel: Detail ── */}
+      {/* ── Main area: Detail (full width) ── */}
       {!selected ? (
         <div className="flex-1 flex items-center justify-center text-gray-400">
           <div className="text-center">
             <p className="text-4xl mb-3">📦</p>
-            <p className="text-sm font-medium">Pilih stok dari kiri</p>
-            <p className="text-xs mt-1">atau klik + New Position</p>
+            <p className="text-sm font-medium">Select a cargo position above</p>
+            <p className="text-xs mt-1">or click + New Position to create one</p>
           </div>
         </div>
       ) : (

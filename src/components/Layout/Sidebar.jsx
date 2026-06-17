@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { logout, changePassword, initPushNotifications } from '../../firebase.js';
 import { useApp } from '../../App.jsx';
 import { canSeeMasterData, getEffectiveMenu } from '../../utils/approvalUtils.js';
-import logo from '../../assets/gpp-logo.png';
+import logo from '../../assets/gpp-logo.jpeg';
 
 const ROLE_LABELS = {
   superadmin: { label: 'Super Admin', color: 'bg-purple-700' },
@@ -18,6 +18,15 @@ export default function Sidebar() {
   const isMasterActive = location.pathname.startsWith('/master-data');
   const [masterOpen,  setMasterOpen]  = useState(isMasterActive);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const closeSidebar = () => setSidebarOpen(false);
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem('sidebar-collapsed') === 'true'
+  );
+  const toggleCollapsed = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    localStorage.setItem('sidebar-collapsed', String(next));
+  };
   const [showPwModal, setShowPwModal] = useState(false);
   const [pwForm, setPwForm] = useState({ current:'', next:'', confirm:'' });
   const [pwError, setPwError] = useState('');
@@ -93,132 +102,166 @@ export default function Sidebar() {
   const showMaster   = canSeeMasterData(userRole);
   const visibleNav   = ALL_NAV.filter(n => allowedRoutes.some(r => r === n.to));
   const roleInfo     = ROLE_LABELS[userRole] || ROLE_LABELS.staff;
-  const closeSidebar = () => setSidebarOpen(false);
 
-  const SidebarContent = () => (
-    <div className="flex flex-col h-full bg-blue-900 text-white">
-      <div className="flex items-center gap-3 p-4 border-b border-blue-800">
-        <img src={logo} alt="GPP" className="w-10 h-10 object-contain bg-white rounded-full p-1 shrink-0"/>
-        <div className="min-w-0">
-          <p className="font-bold text-xs leading-tight truncate">PT Global Petro Pasifik</p>
-          <p className="text-blue-300 text-[10px]">GPP Portal</p>
-        </div>
-        <button onClick={closeSidebar} className="ml-auto text-blue-300 hover:text-white md:hidden">✕</button>
+  // ── Sidebar inner content ─────────────────────────────────────────────────
+  const SidebarContent = ({ mobile = false }) => (
+    <div className="flex flex-col h-full bg-blue-900 text-white overflow-hidden">
+
+      {/* Brand + collapse toggle */}
+      <div className={`flex items-center border-b border-blue-800 shrink-0 ${collapsed && !mobile ? 'p-3 justify-center' : 'p-3 gap-2'}`}>
+        <img src={logo} alt="GPP" className="w-9 h-9 object-contain bg-white rounded-full p-0.5 shrink-0"/>
+        {(!collapsed || mobile) && (
+          <div className="min-w-0 flex-1">
+            <p className="font-bold text-xs leading-tight truncate">PT Global Petro Pasifik</p>
+            <p className="text-blue-300 text-[10px]">GPP Portal</p>
+          </div>
+        )}
+        {mobile
+          ? <button onClick={closeSidebar} className="ml-auto text-blue-300 hover:text-white text-lg leading-none">✕</button>
+          : <button onClick={toggleCollapsed} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              className={`text-blue-400 hover:text-white transition-colors text-sm ${collapsed ? '' : 'ml-auto'}`}>
+              {collapsed ? '›' : '‹'}
+            </button>
+        }
       </div>
 
-      <nav className="flex-1 py-3 space-y-0.5 px-2 overflow-y-auto">
+      {/* Nav */}
+      <nav className="flex-1 py-2 space-y-0.5 px-2 overflow-y-auto overflow-x-hidden">
         {visibleNav.map(({ to, label, icon }) => (
-          <NavLink key={to} to={to} end={to==='/'} onClick={closeSidebar}
+          <NavLink key={to} to={to} end={to==='/'} onClick={mobile ? closeSidebar : undefined}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                isActive ? 'bg-blue-700 text-white font-semibold' : 'text-blue-200 hover:bg-blue-800 hover:text-white'
-              }`}>
-            <span>{icon}</span>{label}
+              `flex items-center rounded-lg text-sm transition-colors ${
+                collapsed && !mobile ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2'
+              } ${isActive ? 'bg-blue-700 text-white font-semibold' : 'text-blue-200 hover:bg-blue-800 hover:text-white'}`}
+            title={collapsed && !mobile ? label : undefined}>
+            <span className="text-base leading-none shrink-0">{icon}</span>
+            {(!collapsed || mobile) && <span className="truncate">{label}</span>}
           </NavLink>
         ))}
 
         {showMaster && (
-          <div>
-            <button onClick={() => setMasterOpen(o => !o)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                isMasterActive ? 'bg-blue-700 text-white font-semibold' : 'text-blue-200 hover:bg-blue-800 hover:text-white'
-              }`}>
-              <span>⚙️</span>
-              <span className="flex-1 text-left">{t('nav_master_data')}</span>
-              <span className="text-xs opacity-60">{masterOpen ? '▲' : '▼'}</span>
-            </button>
-            {masterOpen && (
-              <div className="ml-4 mt-0.5 space-y-0.5 border-l border-blue-700 pl-2">
-                {MASTER_SUBS.map(({ to, label }) => (
-                  <NavLink key={to} to={to} onClick={closeSidebar}
-                    className={({ isActive }) =>
-                      `block px-3 py-2 rounded-lg text-xs transition-colors ${
-                        isActive ? 'bg-blue-600 text-white font-semibold' : 'text-blue-300 hover:bg-blue-800 hover:text-white'
-                      }`}>
-                    {label}
-                  </NavLink>
-                ))}
-              </div>
-            )}
-          </div>
+          collapsed && !mobile ? (
+            <NavLink to="/master-data" onClick={mobile ? closeSidebar : undefined}
+              className={({ isActive }) =>
+                `flex justify-center items-center px-2 py-2.5 rounded-lg text-sm transition-colors ${
+                  isMasterActive ? 'bg-blue-700 text-white' : 'text-blue-200 hover:bg-blue-800 hover:text-white'
+                }`}
+              title="Master Data">
+              <span className="text-base leading-none">⚙️</span>
+            </NavLink>
+          ) : (
+            <div>
+              <button onClick={() => setMasterOpen(o => !o)}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                  isMasterActive ? 'bg-blue-700 text-white font-semibold' : 'text-blue-200 hover:bg-blue-800 hover:text-white'
+                }`}>
+                <span className="text-base leading-none shrink-0">⚙️</span>
+                <span className="flex-1 text-left text-sm truncate">{t('nav_master_data')}</span>
+                <span className="text-xs opacity-60">{masterOpen ? '▲' : '▼'}</span>
+              </button>
+              {masterOpen && (
+                <div className="ml-4 mt-0.5 space-y-0.5 border-l border-blue-700 pl-2">
+                  {MASTER_SUBS.map(({ to, label }) => (
+                    <NavLink key={to} to={to} onClick={mobile ? closeSidebar : undefined}
+                      className={({ isActive }) =>
+                        `block px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                          isActive ? 'bg-blue-600 text-white font-semibold' : 'text-blue-300 hover:bg-blue-800 hover:text-white'
+                        }`}>
+                      {label}
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
         )}
       </nav>
 
-      {/* Footer */}
-      <div className="border-t border-blue-800 p-3 space-y-2">
-        <div className="flex items-center gap-2 px-1">
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white ${roleInfo.color}`}>{roleInfo.label}</span>
-          <p className="text-blue-400 text-[10px] truncate flex-1">{user?.email}</p>
-        </div>
-
-        {/* Language toggle */}
-        <div className="flex items-center gap-2 px-1">
-          <span className="text-[10px] text-blue-400">Language:</span>
-          <button onClick={toggleLang}
-            className="flex items-center gap-1 bg-blue-800 rounded-full px-2 py-1 text-[10px] font-bold hover:bg-blue-700 transition-colors">
-            <span className={lang==='en'?'text-white':'text-blue-400'}>EN</span>
-            <span className="text-blue-600 mx-0.5">|</span>
-            <span className={lang==='id'?'text-white':'text-blue-400'}>ID</span>
+      {/* Footer — compressed */}
+      {(!collapsed || mobile) ? (
+        <div className="border-t border-blue-800 px-2 py-2 space-y-0.5 shrink-0">
+          {/* Role + email */}
+          <div className="flex items-center gap-2 px-1 py-0.5">
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white shrink-0 ${roleInfo.color}`}>{roleInfo.label}</span>
+            <p className="text-blue-400 text-[10px] truncate">{user?.email}</p>
+          </div>
+          {/* Language */}
+          <div className="flex items-center gap-2 px-1 py-0.5">
+            <span className="text-[10px] text-blue-400">Language:</span>
+            <button onClick={toggleLang}
+              className="flex items-center gap-1 bg-blue-800 rounded-full px-2 py-0.5 text-[10px] font-bold hover:bg-blue-700">
+              <span className={lang==='en'?'text-white':'text-blue-400'}>EN</span>
+              <span className="text-blue-600 mx-0.5">|</span>
+              <span className={lang==='id'?'text-white':'text-blue-400'}>ID</span>
+            </button>
+          </div>
+          {/* Change Password */}
+          <button onClick={()=>{setShowPwModal(true); if(mobile) closeSidebar();}}
+            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-blue-200 hover:bg-blue-800 hover:text-white transition-colors">
+            <span>🔑</span> {t('nav_change_pw')}
+          </button>
+          {/* Notifications */}
+          <button onClick={registerNotifications} disabled={notifState === 'loading'}
+            className={`w-full flex items-start gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors ${
+              notifState === 'ok'     ? 'text-green-300 bg-blue-800' :
+              notifState === 'denied' ? 'text-red-300 bg-blue-800'  :
+              notifState === 'error'  ? 'text-amber-300 bg-blue-800':
+                                        'text-blue-200 hover:bg-blue-800 hover:text-white'
+            }`}>
+            <span className="shrink-0">{notifState==='loading'?'⏳':notifState==='ok'?'✅':notifState==='denied'?'🚫':notifState==='error'?'⚠️':'🔔'}</span>
+            <span className="leading-tight">{notifState==='loading'?'Registering…':notifState==='ok'?'Notifications on':notifState==='denied'?'Permission denied':notifState==='error'?'Failed — retry':'Enable Notifications'}</span>
+          </button>
+          {/* Guides */}
+          <div className="flex gap-1 px-1">
+            <a href="/manual-id.html" target="_blank" rel="noopener"
+              className="flex-1 flex items-center justify-center gap-1 py-1 rounded text-[10px] text-blue-300 hover:bg-blue-800 hover:text-white border border-blue-800">
+              📖 {t('nav_guide')}
+            </a>
+            <a href="/manual-en.html" target="_blank" rel="noopener"
+              className="flex-1 flex items-center justify-center gap-1 py-1 rounded text-[10px] text-blue-300 hover:bg-blue-800 hover:text-white border border-blue-800">
+              📖 {t('nav_manual')}
+            </a>
+          </div>
+          {/* Logout */}
+          <button onClick={() => logout()}
+            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-blue-200 hover:bg-blue-800 hover:text-white transition-colors">
+            <span>🔓</span> {t('nav_logout')}
           </button>
         </div>
-
-        <button onClick={()=>{setShowPwModal(true);closeSidebar();}}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-blue-200 hover:bg-blue-800 hover:text-white transition-colors">
-          <span>🔑</span> {t('nav_change_pw')}
-        </button>
-
-        {/* Notification registration — visible to all users */}
-        <button onClick={registerNotifications} disabled={notifState === 'loading'}
-          className={`w-full flex items-start gap-2 px-3 py-2 rounded-lg text-xs transition-colors ${
-            notifState === 'ok'     ? 'text-green-300 bg-blue-800' :
-            notifState === 'denied' ? 'text-red-300 bg-blue-800'  :
-            notifState === 'error'  ? 'text-amber-300 bg-blue-800':
-                                      'text-blue-200 hover:bg-blue-800 hover:text-white'
-          }`}>
-          <span className="shrink-0 mt-0.5">
-            {notifState === 'loading' ? '⏳' :
-             notifState === 'ok'      ? '✅' :
-             notifState === 'denied'  ? '🚫' :
-             notifState === 'error'   ? '⚠️' : '🔔'}
-          </span>
-          <span>
-            {notifState === 'loading' ? 'Registering…' :
-             notifState === 'ok'      ? 'Notifications enabled!' :
-             notifState === 'denied'  ? `Permission denied${notifDetail ? ' — ' + notifDetail : ''}` :
-             notifState === 'error'   ? `Failed${notifDetail ? ': ' + notifDetail : ''}` :
-                                        'Enable Notifications'}
-          </span>
-        </button>
-        <div className="flex gap-1 px-3">
-          <a href="/manual-id.html" target="_blank" rel="noopener"
-            className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs text-blue-300 hover:bg-blue-800 hover:text-white transition-colors border border-blue-800">
-            📖 {t('nav_guide')}
-          </a>
-          <a href="/manual-en.html" target="_blank" rel="noopener"
-            className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs text-blue-300 hover:bg-blue-800 hover:text-white transition-colors border border-blue-800">
-            📖 {t('nav_manual')}
-          </a>
+      ) : (
+        /* Collapsed footer — just icons */
+        <div className="border-t border-blue-800 py-2 flex flex-col items-center gap-1 shrink-0">
+          <button onClick={toggleLang} title="Toggle language" className="text-blue-400 hover:text-white text-xs py-1">
+            {lang === 'en' ? 'EN' : 'ID'}
+          </button>
+          <button onClick={registerNotifications} title="Enable Notifications" className="py-1 text-base hover:scale-110 transition-transform">
+            {notifState==='ok'?'✅':notifState==='error'?'⚠️':'🔔'}
+          </button>
+          <button onClick={() => logout()} title="Log Out" className="text-blue-400 hover:text-white py-1 text-base">
+            🔓
+          </button>
         </div>
-        <button onClick={() => logout()}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-blue-200 hover:bg-blue-800 hover:text-white transition-colors">
-          <span>🔓</span> {t('nav_logout')}
-        </button>
-      </div>
+      )}
     </div>
   );
 
   return (
     <>
+      {/* Mobile hamburger */}
       <button onClick={() => setSidebarOpen(true)}
         className="no-print md:hidden fixed top-3 left-3 z-40 bg-blue-900 text-white rounded-lg p-2 shadow-lg">☰</button>
+
+      {/* Mobile overlay */}
       {sidebarOpen && (
         <div className="md:hidden fixed inset-0 z-40 flex">
-          <div className="w-56 h-full shadow-2xl"><SidebarContent /></div>
+          <div className="w-56 h-full shadow-2xl"><SidebarContent mobile={true} /></div>
           <div className="flex-1 bg-black bg-opacity-50" onClick={closeSidebar}/>
         </div>
       )}
-      <aside className="no-print hidden md:flex md:flex-col md:w-56 md:shrink-0 h-full">
-        <SidebarContent />
+
+      {/* Desktop sidebar — width controlled by collapsed state */}
+      <aside className={`no-print hidden md:flex md:flex-col md:shrink-0 h-full transition-all duration-200 ${collapsed ? 'md:w-16' : 'md:w-56'}`}>
+        <SidebarContent mobile={false} />
       </aside>
 
       {/* Change Password Modal */}
