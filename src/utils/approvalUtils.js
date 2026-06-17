@@ -71,10 +71,10 @@ export const canDelete = (role) =>
 
 // Menu access per role
 export const ROLE_MENU = {
-  superadmin: ['/', '/stok', '/calculator', '/offering-letter', '/sales-order', '/purchase-order', '/delivery-order', '/mops', '/master-data'],
-  director:   ['/', '/stok', '/calculator', '/offering-letter', '/sales-order', '/purchase-order', '/delivery-order', '/mops', '/master-data'],
-  manager:    ['/', '/stok', '/calculator', '/offering-letter', '/sales-order', '/purchase-order', '/delivery-order', '/mops'],
-  staff:      ['/', '/stok', '/calculator', '/offering-letter', '/sales-order', '/purchase-order', '/delivery-order', '/mops'],
+  superadmin: ['/', '/stok', '/calculator', '/offering-letter', '/sales-order', '/invoice', '/purchase-order', '/delivery-order', '/mops', '/master-data'],
+  director:   ['/', '/stok', '/calculator', '/offering-letter', '/sales-order', '/invoice', '/purchase-order', '/delivery-order', '/mops', '/master-data'],
+  manager:    ['/', '/stok', '/calculator', '/offering-letter', '/sales-order', '/invoice', '/purchase-order', '/delivery-order', '/mops'],
+  staff:      ['/', '/stok', '/calculator', '/offering-letter', '/sales-order', '/invoice', '/purchase-order', '/delivery-order', '/mops'],
 };
 
 export const canAccessRoute = (role, path) => {
