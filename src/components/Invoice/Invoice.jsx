@@ -55,8 +55,44 @@ function calcTotals(items, discount, applyPPN, ppnRate) {
   return { subtotal, disc, tax, total };
 }
 
-// ─── Print HTML generator ─────────────────────────────────────────────────────
-function generateInvoiceHtml(inv, company, banks) {
+// ─── Print HTML generator (bilingual EN / ID) ─────────────────────────────────
+function generateInvoiceHtml(inv, company, banks, lang = 'id') {
+  const isEN = lang === 'en';
+
+  const T = {
+    docTitle:   isEN ? 'Sales Invoice'                  : 'Faktur Penjualan',
+    invoiceDate:isEN ? 'Invoice Date'                   : 'Tanggal Invoice',
+    invoiceNo:  isEN ? 'Invoice No.'                    : 'No. Invoice',
+    terms:      isEN ? 'Terms'                          : 'Syarat Pembayaran',
+    destination:isEN ? 'Destination'                    : 'Tujuan',
+    shipVia:    isEN ? 'Ship Via'                       : 'Dikirim Via',
+    shipDate:   isEN ? 'Ship Date'                      : 'Tanggal Kirim',
+    poNo:       isEN ? 'PO No.'                         : 'No. PO',
+    currency:   isEN ? 'Currency'                       : 'Mata Uang',
+    billTo:     isEN ? 'Bill To'                        : 'Tagih Kepada',
+    shipTo:     isEN ? 'Ship To'                        : 'Kirim Ke',
+    colNo:      isEN ? 'No.'                            : 'No.',
+    colDesc:    isEN ? 'Item Description'               : 'Uraian / Keterangan',
+    colQty:     isEN ? 'Qty'                            : 'Kuantitas',
+    colPrice:   isEN ? 'Unit Price'                     : 'Harga Satuan',
+    colAmount:  isEN ? 'Amount'                         : 'Jumlah',
+    say:        isEN ? 'Say :'                          : 'Terbilang :',
+    subTotal:   isEN ? 'Sub Total :'                    : 'Sub Total :',
+    discount:   isEN ? 'Discount :'                     : 'Diskon :',
+    tax:        isEN ? `Tax (PPN ${inv.ppnRate||11}%) :`  : `Pajak (PPN ${inv.ppnRate||11}%) :`,
+    totalInv:   isEN ? 'Total Invoice :'                : 'Total Invoice :',
+    payIntro:   isEN ? 'Kindly remit payment via TT to our bank account:'
+                     : 'Mohon pembayaran dikirim via TT ke rekening berikut:',
+    bankName:   isEN ? 'Name'                           : 'Nama',
+    bankLabel:  isEN ? 'Bank'                           : 'Bank',
+    acNo:       isEN ? 'A/C No.'                        : 'No. Rekening',
+    closing:    isEN ? 'Thank you and we look forward to your next order.'
+                     : 'Terima kasih dan kami tunggu pesanan selanjutnya.',
+    regards:    isEN ? 'Best Regard,'                   : 'Hormat Kami,',
+    finance:    isEN ? 'Finance Dept.'                  : 'Bagian Keuangan',
+    headOffice: isEN ? 'Head Office'                    : 'Kantor Pusat',
+  };
+
   const bank = inv.bankId
     ? (banks || []).find(b => String(b.id) === String(inv.bankId)) || (banks || [])[0] || {}
     : (banks || []).find(b => b.isPrimary) || (banks || [])[0] || {};
@@ -68,87 +104,102 @@ function generateInvoiceHtml(inv, company, banks) {
   const fmtDatePrint = (s) => {
     if (!s) return '';
     const d = new Date(s + 'T12:00:00');
-    const M = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-    return `${d.getDate()} ${M[d.getMonth()]} ${d.getFullYear()}`;
+    const M_id = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+    const M_en = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    return `${d.getDate()} ${(isEN ? M_en : M_id)[d.getMonth()]} ${d.getFullYear()}`;
   };
 
-  return `<!DOCTYPE html><html lang="id"><head>
-<meta charset="UTF-8"/><title>${inv.invoiceNumber || 'Invoice'}</title>
+  // Language toggle bar (calls opener to re-render with new lang)
+  const toggleBar = `
+    <div id="lang-bar" style="position:fixed;top:0;left:0;right:0;background:#1a3a6b;color:white;padding:8px 20px;display:flex;align-items:center;gap:16px;z-index:999;font-family:sans-serif;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,0.3)">
+      <span style="font-weight:700">GPP Portal — ${T.docTitle}</span>
+      <span style="margin-left:auto;display:flex;gap:8px;align-items:center">
+        <span>Language:</span>
+        <button onclick="switchLang('id')" style="padding:3px 12px;border-radius:99px;border:none;cursor:pointer;font-weight:700;background:${!isEN?'white':'rgba(255,255,255,0.2)'};color:${!isEN?'#1a3a6b':'white'}">🇮🇩 ID</button>
+        <button onclick="switchLang('en')" style="padding:3px 12px;border-radius:99px;border:none;cursor:pointer;font-weight:700;background:${isEN?'white':'rgba(255,255,255,0.2)'};color:${isEN?'#1a3a6b':'white'}">🇬🇧 EN</button>
+        <button onclick="window.print()" style="padding:4px 16px;border-radius:6px;border:none;cursor:pointer;background:#f59e0b;color:white;font-weight:700;margin-left:8px">🖨️ Print / Save PDF</button>
+      </span>
+    </div>
+    <script>
+      window._invDoc = ${JSON.stringify(inv)};
+      function switchLang(l) {
+        const opener = window.opener;
+        if (opener && typeof opener._gppGenerateInvoice === 'function') {
+          const html = opener._gppGenerateInvoice(window._invDoc, l);
+          document.open(); document.write(html); document.close();
+        } else {
+          alert('Please re-open the preview from the app to switch language.');
+        }
+      }
+    <\/script>`;
+
+  return `<!DOCTYPE html><html lang="${lang}"><head>
+<meta charset="UTF-8"/><title>${inv.invoiceNumber || 'Invoice'} — ${T.docTitle}</title>
 <style>
   * { box-sizing:border-box; margin:0; padding:0; }
   body { font-family:'Segoe UI',Arial,sans-serif; font-size:11px; color:#222; background:white; }
-  .page { max-width:210mm; margin:0 auto; padding:16mm 16mm 12mm; }
+  .page { max-width:210mm; margin:0 auto; padding:56px 16mm 12mm; }
   table { width:100%; border-collapse:collapse; }
   th,td { padding:5px 8px; border:1px solid #aaa; }
   th { background:#1a3a6b; color:white; text-align:left; font-size:10px; }
-  .no-border td { border:none; padding:2px 0; }
-  .total-box td { border:1px solid #bbb; padding:4px 10px; }
+  .nb td { border:none; padding:2px 0; }
+  .tot td { border:1px solid #bbb; padding:4px 10px; }
   @media print {
-    .no-print { display:none !important; }
-    .page { padding:10mm; }
+    #lang-bar { display:none !important; }
+    .page { padding:15mm; }
     @page { size:A4; margin:0; }
   }
 </style></head><body>
-<div class="no-print" style="position:fixed;top:0;left:0;right:0;background:#1e3a8a;color:white;padding:8px 20px;display:flex;align-items:center;justify-content:space-between;z-index:999;font-family:sans-serif;font-size:12px">
-  <span style="font-weight:700">GPP Portal — Sales Invoice</span>
-  <button onclick="window.print()" style="background:#f59e0b;color:white;border:none;padding:5px 18px;border-radius:6px;font-weight:700;cursor:pointer">🖨️ Print / Save PDF</button>
-</div>
-<div class="page" style="margin-top:36px">
+${toggleBar}
+<div class="page">
 
   <!-- Letterhead -->
   <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
     <div style="display:flex;align-items:center;gap:12px">
-      <div style="background:#1a3a6b;color:white;font-weight:900;font-size:18px;padding:8px 14px;border-radius:4px;letter-spacing:1px">GPP</div>
+      <div style="background:#1a3a6b;color:white;font-weight:900;font-size:18px;padding:8px 14px;border-radius:4px">GPP</div>
       <div>
-        <p style="font-size:16px;font-weight:800;color:#1a3a6b">${company.name || 'PT GLOBAL PETRO PASIFIK'}</p>
+        <p style="font-size:15px;font-weight:800;color:#1a3a6b">${company.name || 'PT GLOBAL PETRO PASIFIK'}</p>
         <p style="font-size:9px;color:#555">${addr}</p>
         ${company.phone ? `<p style="font-size:9px;color:#555">Telp: ${company.phone}</p>` : ''}
       </div>
     </div>
     <div style="text-align:right">
-      <p style="font-size:26px;font-weight:300;color:#1a3a6b;letter-spacing:2px">Sales Invoice</p>
+      <p style="font-size:26px;font-weight:300;color:#1a3a6b;letter-spacing:2px">${T.docTitle}</p>
     </div>
   </div>
 
-  <!-- Invoice meta box + Bill To -->
-  <div style="display:flex;gap:16px;margin-bottom:14px">
-    <!-- Bill To / Ship To -->
+  <!-- Bill To + Ship To + Meta box -->
+  <div style="display:flex;gap:14px;margin-bottom:14px">
     <div style="flex:1">
       <table style="font-size:10px">
-        <tr style="background:none"><td style="border:1px solid #aaa;padding:3px 6px;background:#f3f4f6;font-weight:700;width:60px;color:#333">Bill To</td>
+        <tr style="background:none">
+          <td style="border:1px solid #aaa;padding:3px 6px;background:#f3f4f6;font-weight:700;width:70px;color:#333">${T.billTo}</td>
           <td style="border:1px solid #aaa;padding:3px 6px">
             <b>${inv.clientName || ''}</b><br>
             ${(inv.clientAddress||'').split('\n').filter(Boolean).join('<br>')}
+            ${inv.clientNPWP ? `<br><span style="color:#777;font-size:9px">NPWP: ${inv.clientNPWP}</span>` : ''}
           </td>
         </tr>
-        <tr style="background:none"><td style="border:1px solid #aaa;padding:3px 6px;background:#f3f4f6;font-weight:700;color:#333">Ship To</td>
-          <td style="border:1px solid #aaa;padding:3px 6px">${inv.shipTo || ''}</td>
+        <tr style="background:none">
+          <td style="border:1px solid #aaa;padding:3px 6px;background:#f3f4f6;font-weight:700;color:#333">${T.shipTo}</td>
+          <td style="border:1px solid #aaa;padding:3px 6px">${(inv.shipTo||'').split('\n').join('<br>')}</td>
         </tr>
       </table>
     </div>
-    <!-- Meta box -->
     <div style="min-width:260px">
       <table style="font-size:10px">
-        <tr><td style="background:#f3f4f6;font-weight:600;border:1px solid #aaa;padding:3px 8px;width:100px">Invoice Date</td>
-            <td style="border:1px solid #aaa;padding:3px 8px">${fmtDatePrint(inv.invoiceDate)}</td>
-            <td style="background:#f3f4f6;font-weight:600;border:1px solid #aaa;padding:3px 8px">Invoice No.</td>
-            <td style="border:1px solid #aaa;padding:3px 8px;font-weight:700;color:#1a3a6b">${inv.invoiceNumber || ''}</td>
-        </tr>
-        <tr><td style="background:#f3f4f6;font-weight:600;border:1px solid #aaa;padding:3px 8px">Terms</td>
-            <td style="border:1px solid #aaa;padding:3px 8px">${inv.terms || ''}</td>
-            <td style="background:#f3f4f6;font-weight:600;border:1px solid #aaa;padding:3px 8px">Destination</td>
-            <td style="border:1px solid #aaa;padding:3px 8px">${inv.destination || ''}</td>
-        </tr>
-        <tr><td style="background:#f3f4f6;font-weight:600;border:1px solid #aaa;padding:3px 8px">Ship Via</td>
-            <td style="border:1px solid #aaa;padding:3px 8px">${inv.shipVia || ''}</td>
-            <td style="background:#f3f4f6;font-weight:600;border:1px solid #aaa;padding:3px 8px">Ship Date</td>
-            <td style="border:1px solid #aaa;padding:3px 8px">${fmtDatePrint(inv.shipDate)}</td>
-        </tr>
-        <tr><td style="background:#f3f4f6;font-weight:600;border:1px solid #aaa;padding:3px 8px">PO No.</td>
-            <td style="border:1px solid #aaa;padding:3px 8px">${inv.poNo || ''}</td>
-            <td style="background:#f3f4f6;font-weight:600;border:1px solid #aaa;padding:3px 8px">Currency</td>
-            <td style="border:1px solid #aaa;padding:3px 8px">${inv.currency || 'IDR'}</td>
-        </tr>
+        ${[
+          [T.invoiceDate, fmtDatePrint(inv.invoiceDate), T.invoiceNo, `<b style="color:#1a3a6b">${inv.invoiceNumber||''}</b>`],
+          [T.terms, inv.terms||'', T.destination, inv.destination||''],
+          [T.shipVia, inv.shipVia||'', T.shipDate, fmtDatePrint(inv.shipDate)],
+          [T.poNo, inv.poNo||'', T.currency, inv.currency||'IDR'],
+        ].map(([k1,v1,k2,v2]) => `
+          <tr>
+            <td style="background:#f3f4f6;font-weight:600;border:1px solid #aaa;padding:3px 8px;width:80px">${k1}</td>
+            <td style="border:1px solid #aaa;padding:3px 8px">${v1}</td>
+            <td style="background:#f3f4f6;font-weight:600;border:1px solid #aaa;padding:3px 8px">${k2}</td>
+            <td style="border:1px solid #aaa;padding:3px 8px">${v2}</td>
+          </tr>`).join('')}
       </table>
     </div>
   </div>
@@ -156,75 +207,76 @@ function generateInvoiceHtml(inv, company, banks) {
   <!-- Line items -->
   <table style="margin-bottom:6px;font-size:11px">
     <thead><tr>
-      <th style="width:30px;text-align:center">No.</th>
-      <th>Item Description</th>
-      <th style="width:90px;text-align:right">Qty</th>
-      <th style="width:110px;text-align:right">Unit Price</th>
-      <th style="width:130px;text-align:right">Amount</th>
+      <th style="width:30px;text-align:center">${T.colNo}</th>
+      <th>${T.colDesc}</th>
+      <th style="width:90px;text-align:right">${T.colQty}</th>
+      <th style="width:110px;text-align:right">${T.colPrice}</th>
+      <th style="width:130px;text-align:right">${T.colAmount}</th>
     </tr></thead>
     <tbody>
-      ${(inv.items || []).map((it, i) => `
+      ${(inv.items||[]).map((it,i) => `
         <tr>
           <td style="text-align:center">${i+1}</td>
-          <td>${it.description || ''}</td>
+          <td>${it.description||''}</td>
           <td style="text-align:right;font-family:monospace">${fmtMoney(it.qty)}</td>
           <td style="text-align:right;font-family:monospace">${fmtMoney(it.unitPrice)}</td>
           <td style="text-align:right;font-family:monospace">${fmtMoney(it.amount)}</td>
         </tr>`).join('')}
-      ${Array.from({ length: Math.max(0, 6 - (inv.items||[]).length) }, () =>
+      ${Array.from({ length: Math.max(0, 6-(inv.items||[]).length) }, () =>
         `<tr><td style="height:18px">&nbsp;</td><td></td><td></td><td></td><td></td></tr>`
       ).join('')}
     </tbody>
   </table>
 
-  <!-- Say + totals row -->
+  <!-- Say + Totals -->
   <div style="display:flex;gap:16px;margin-bottom:14px;align-items:flex-start">
     <div style="flex:1">
-      <table class="no-border" style="font-size:10px;margin-bottom:4px">
-        <tr><td style="font-weight:600;padding:2px 0;width:36px">Say :</td>
-            <td style="font-style:italic;padding:2px 0;border-bottom:1px solid #aaa">${sayText}</td></tr>
+      <table class="nb" style="font-size:10px;margin-bottom:4px">
+        <tr><td style="font-weight:600;width:80px">${T.say}</td>
+            <td style="font-style:italic;border-bottom:1px solid #aaa">${sayText}</td></tr>
       </table>
-      ${inv.notes ? `<div style="margin-top:6px"><p style="font-size:9px;font-weight:600;color:#555">Description:</p>
-        <div style="border:1px solid #aaa;padding:6px 8px;min-height:40px;font-size:10px">${inv.notes}</div></div>` : ''}
+      ${inv.notes ? `<div style="margin-top:6px;font-size:10px">
+        <p style="font-size:9px;font-weight:600;color:#555;margin-bottom:2px">Notes / Keterangan:</p>
+        <div style="border:1px solid #aaa;padding:6px 8px;min-height:36px">${inv.notes}</div>
+      </div>` : ''}
     </div>
     <div style="min-width:240px">
-      <table class="total-box" style="font-size:11px">
-        <tr><td style="width:110px">Sub Total :</td><td style="text-align:right;font-family:monospace">${fmtMoney(subtotal)}</td></tr>
-        <tr><td>Discount :</td><td style="text-align:right;font-family:monospace">${fmtMoney(disc)}</td></tr>
-        <tr><td>Tax${inv.applyPPN ? ` (PPN ${inv.ppnRate||11}%)` : ''} :</td>
-            <td style="text-align:right;font-family:monospace">${fmtMoney(tax)}</td></tr>
+      <table class="tot" style="font-size:11px">
+        <tr><td style="width:120px">${T.subTotal}</td><td style="text-align:right;font-family:monospace">${fmtMoney(subtotal)}</td></tr>
+        <tr><td>${T.discount}</td><td style="text-align:right;font-family:monospace">${fmtMoney(disc)}</td></tr>
+        <tr><td>${T.tax}</td><td style="text-align:right;font-family:monospace">${fmtMoney(tax)}</td></tr>
         <tr style="background:#f3f4f6">
-          <td style="font-weight:800;font-size:12px">Total Invoice :</td>
+          <td style="font-weight:800;font-size:12px">${T.totalInv}</td>
           <td style="text-align:right;font-family:monospace;font-weight:800;font-size:12px">${fmtMoney(total)}</td>
         </tr>
       </table>
     </div>
   </div>
 
-  <!-- Payment info + signature -->
+  <!-- Payment + Signature -->
   <div style="display:flex;gap:16px;align-items:flex-end">
     <div style="flex:1;font-size:10px">
       ${bank.bankName ? `
-      <p style="margin-bottom:2px">Kindly Please Send Us Payment By TT To Our Bank Account :</p>
-      <table class="no-border" style="font-size:10px">
-        <tr><td style="width:50px">Name</td><td>: ${bank.accountName || company.name}</td></tr>
-        <tr><td>Bank</td><td>: ${bank.bankName}</td></tr>
-        <tr><td>A/C No.</td><td>: ${bank.accountNo}</td></tr>
+      <p style="margin-bottom:4px">${T.payIntro}</p>
+      <table class="nb" style="font-size:10px">
+        <tr><td style="width:70px">${T.bankName}</td><td>: ${bank.accountName || company.name}</td></tr>
+        <tr><td>${T.bankLabel}</td><td>: ${bank.bankName}</td></tr>
+        <tr><td>${T.acNo}</td><td>: ${bank.accountNo}</td></tr>
       </table>` : ''}
-      <p style="margin-top:12px;font-size:10px;color:#555">Thank you and waiting your next order.</p>
+      <p style="margin-top:14px;font-size:10px;color:#555">${T.closing}</p>
     </div>
     <div style="text-align:center;min-width:200px;font-size:10px">
-      <p>Best Regard</p>
+      <p>${T.regards}</p>
       <p style="font-weight:700">${company.name || 'PT Global Petro Pasifik'}</p>
       <div style="height:60px"></div>
-      <p style="border-top:1px solid #999;padding-top:4px">Finance Dept.</p>
+      <p style="border-top:1px solid #999;padding-top:4px">${T.finance}</p>
     </div>
   </div>
 
-  <!-- Footer addresses -->
-  ${(company.address || '') ? `
-  <div style="margin-top:20px;border-top:1px solid #aaa;padding-top:6px;text-align:center;font-size:9px;color:#555">
-    <p><b>Head Office :</b> ${(company.address||'').split('\n').filter(Boolean).join(', ')}</p>
+  <!-- Footer -->
+  ${company.address ? `
+  <div style="margin-top:18px;border-top:1px solid #aaa;padding-top:6px;text-align:center;font-size:9px;color:#555">
+    <p><b>${T.headOffice} :</b> ${(company.address||'').split('\n').filter(Boolean).join(', ')}</p>
   </div>` : ''}
 
 </div></body></html>`;
@@ -332,11 +384,11 @@ export default function Invoice({ prefillFromSO = null, onCreated = null }) {
   };
 
   // ── Print ──────────────────────────────────────────────────────────────────
-  const printInvoice = (inv) => {
-    window._gppPrintInvoice = (doc) => generateInvoiceHtml(doc, co, banks);
-    const html = generateInvoiceHtml(inv, co, banks);
+  const printInvoice = (inv, lang = 'id') => {
+    window._gppGenerateInvoice = (doc, l) => generateInvoiceHtml(doc, co, banks, l);
+    const html = generateInvoiceHtml(inv, co, banks, lang);
     const win = window.open('', '_blank', 'width=960,height=800,scrollbars=yes');
-    if (!win) { alert('Pop-up blocked.'); return; }
+    if (!win) { alert('Pop-up blocked. Please allow pop-ups for this site.'); return; }
     win.document.write(html);
     win.document.close();
     win.focus();
@@ -412,11 +464,17 @@ export default function Invoice({ prefillFromSO = null, onCreated = null }) {
                       <p className="font-mono font-bold text-gray-800">Rp {fmtIDR(total)}</p>
                       <StatusBadge status={inv.status} />
                     </div>
-                    <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => openEdit(inv)}
                         className="text-xs bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-100">✏️</button>
-                      <button onClick={() => printInvoice(inv)}
-                        className="text-xs bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-100">🖨️</button>
+                      <button onClick={() => printInvoice(inv, 'id')}
+                        className="text-xs bg-gray-50 border border-gray-200 px-2.5 py-1.5 rounded-lg hover:bg-gray-100" title="Print Bahasa Indonesia">
+                        🖨️ ID
+                      </button>
+                      <button onClick={() => printInvoice(inv, 'en')}
+                        className="text-xs bg-gray-50 border border-gray-200 px-2.5 py-1.5 rounded-lg hover:bg-gray-100" title="Print English">
+                        🖨️ EN
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -659,10 +717,16 @@ export default function Invoice({ prefillFromSO = null, onCreated = null }) {
             Cancel
           </button>
           {form.id && (
-            <button onClick={() => printInvoice(form)}
-              className="border border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-50">
-              🖨️ Preview Print
-            </button>
+            <>
+              <button onClick={() => printInvoice(form, 'id')}
+                className="border border-gray-200 text-gray-700 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-50">
+                🖨️ ID
+              </button>
+              <button onClick={() => printInvoice(form, 'en')}
+                className="border border-gray-200 text-gray-700 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-50">
+                🖨️ EN
+              </button>
+            </>
           )}
           <button onClick={() => save('draft')} disabled={saving}
             className="border border-blue-200 text-blue-700 bg-blue-50 px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-100 disabled:opacity-50">
